@@ -1,0 +1,113 @@
+# Base44 sandbox environment for PeerTube: runs the repository from source with
+# live reload (PeerTube server on :9000, Angular client on :3000).
+#
+# This is a development environment, NOT a production deployment: production
+# uses support/docker/production/docker-compose.yml.
+#
+# Sandbox specifics (see AGENTS.md):
+#  - NODE_CONFIG points PeerTube at the compose services (postgres/redis) and
+#    tells it its public hostname is the preview URL, so generated file/tracker
+#    URLs go through the dev-server proxy instead of http://localhost:9000.
+#  - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS is set by the platform so the
+#    Angular dev server accepts the preview's host header.
+
+name: peertube-base44
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: on-failure
+    environment:
+      POSTGRES_USER: peertube
+      POSTGRES_PASSWORD: peertube
+      POSTGRES_DB: peertube_dev
+    volumes:
+      - peertube_postgres_data:/var/lib/postgresql/data
+      - ./.base44/postgres-init.sql:/docker-entrypoint-initdb.d/01-peertube.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U peertube -d peertube_dev" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: on-failure
+    volumes:
+      - peertube_redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build:
+      context: .
+      dockerfile: .base44/Dockerfile
+    restart: on-failure
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000" # Angular client — the preview entry point
+      - "9000:9000" # PeerTube server (API, ActivityPub, static files)
+    environment:
+      - NODE_ENV=dev
+      - BASE44_PREVIEW_MODE
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+      - 'NODE_CONFIG={"database":{"hostname":"postgres"},"redis":{"hostname":"redis"},"listen":{"hostname":"0.0.0.0"},"webserver":{"hostname":"3000-${BASE44_PUBLIC_HOST_SUFFIX}","port":443,"https":true}}'
+    volumes:
+      # Repository mounted from the sandbox so edits are picked up live
+      - .:/app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS -o /dev/null http://127.0.0.1:9000/api/v1/config
+          || { echo 'server (:9000) is not responding'; exit 1; };
+          curl -fsS -o /dev/null http://127.0.0.1:3000/
+          || { echo 'client (:3000) is not responding'; exit 1; }
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 1800s
+    command:
+      - sh
+      - -ec
+      - |
+        echo '[base44] installing node dependencies (pnpm, frozen lockfile)'
+        CI=true pnpm install --frozen-lockfile
+
+        echo '[base44] compiling the server and its workspace packages (the player build needs their dist/)'
+        npm run tsc -- -b server/tsconfig.json
+
+        # The client is served by the Angular dev server, but some assets (logo,
+        # mascots) are requested from the backend under /client/assets: mirror what
+        # scripts/build/server.sh does, without building the whole client.
+        mkdir -p client/dist
+        rm -rf client/dist/assets
+        cp -r client/src/assets client/dist/assets
+
+        echo '[base44] building the standalone player the Angular client imports'
+        ( cd client/src/standalone/player && npm run build )
+
+        echo '[base44] preparing the dev-server proxy (repo proxy + P2P tracker socket)'
+        node --input-type=commonjs -e "
+          const fs = require('fs')
+          const proxy = JSON.parse(fs.readFileSync('client/proxy.config.json', 'utf8'))
+          proxy['/tracker/socket'] = { target: 'ws://127.0.0.1:9000', secure: false, ws: true }
+          fs.writeFileSync('/tmp/base44-ng-proxy.config.json', JSON.stringify(proxy, null, 2))
+        "
+
+        echo '[base44] starting PeerTube server (live reload) and Angular client'
+        exec node_modules/.bin/concurrently -k -n server,client -c blue,green \
+          'sh scripts/dev/server.sh --skip-client' \
+          'cd client && exec node_modules/.bin/ng serve --proxy-config /tmp/base44-ng-proxy.config.json --hmr --configuration sandbox --host 0.0.0.0 --port 3000'
+
+volumes:
+  peertube_postgres_data:
+  peertube_redis_data:

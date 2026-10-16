@@ -1,0 +1,46 @@
+import { ResponseTuple, UploadxResponse } from '../types';
+export declare enum ERRORS {
+    BAD_REQUEST = "BadRequest",
+    FILE_CONFLICT = "FileConflict",
+    FILE_ERROR = "FileError",
+    FILE_NOT_ALLOWED = "FileNotAllowed",
+    FILE_NOT_FOUND = "FileNotFound",
+    FORBIDDEN = "Forbidden",
+    GONE = "Gone",
+    INVALID_CONTENT_TYPE = "InvalidContentType",
+    INVALID_FILE_NAME = "InvalidFileName",
+    INVALID_FILE_SIZE = "InvalidFileSize",
+    INVALID_RANGE = "InvalidRange",
+    METHOD_NOT_ALLOWED = "MethodNotAllowed",
+    REQUEST_ENTITY_TOO_LARGE = "RequestEntityTooLarge",
+    STORAGE_ERROR = "StorageError",
+    TOO_MANY_REQUESTS = "TooManyRequests",
+    UNKNOWN_ERROR = "UnknownError",
+    UNPROCESSABLE_ENTITY = "UnprocessableEntity",
+    UNSUPPORTED_MEDIA_TYPE = "UnsupportedMediaType",
+    CHECKSUM_MISMATCH = "ChecksumMismatch",
+    UNSUPPORTED_CHECKSUM_ALGORITHM = "UnsupportedChecksumAlgorithm",
+    REQUEST_ABORTED = "RequestAborted"
+}
+export interface UploadxErrorResponse extends UploadxResponse {
+    [key: string]: unknown;
+    statusCode: number;
+    code?: string;
+    message: string;
+    body?: Record<string, any>;
+    name?: string;
+    retryable?: boolean;
+    cause?: unknown;
+}
+export type ErrorResponses<T extends string = string> = {
+    [K in T]: UploadxErrorResponse;
+};
+export declare const ErrorMap: ErrorResponses<ERRORS>;
+export declare class UploadxError extends Error {
+    uploadxErrorCode: string;
+    cause?: unknown;
+    constructor(uploadxErrorCode?: string, message?: string, cause?: unknown);
+}
+export declare function isUploadxError(error: unknown): error is UploadxError;
+export declare function normalizeErrorResponse(response: ResponseTuple | UploadxErrorResponse): UploadxErrorResponse;
+export declare function fail(uploadxErrorCode: ERRORS, cause?: unknown): Promise<never>;

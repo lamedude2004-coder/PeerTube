@@ -1,0 +1,144 @@
+"use strict";
+// CSS Color 5 color-mix(). Interpolates two colors in a chosen color space with
+// premultiplied alpha and the four hue-interpolation methods.
+// https://drafts.csswg.org/css-color-5/#color-mix
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.colorMix = colorMix;
+const bits_1 = require("../core/bits");
+const bytes_1 = require("../core/bytes");
+const channels_1 = require("../conversion/channels");
+// Both interpolation endpoints are alive at once, so each gets its own buffer.
+const CHANNELS_1 = new Float64Array(3);
+const CHANNELS_2 = new Float64Array(3);
+function fail(message) {
+    throw new Error('color-mix(): ' + message);
+}
+function normalizeHue(h) {
+    return ((h % 360) + 360) % 360;
+}
+function adjustHue(h1, h2, method) {
+    h1 = normalizeHue(h1);
+    h2 = normalizeHue(h2);
+    const d = h2 - h1;
+    switch (method) {
+        case 'shorter':
+            if (d > 180)
+                h1 += 360;
+            else if (d < -180)
+                h2 += 360;
+            break;
+        case 'longer':
+            if (d > 0 && d < 180)
+                h1 += 360;
+            else if (d > -180 && d <= 0)
+                h2 += 360;
+            break;
+        case 'increasing':
+            if (h2 < h1)
+                h2 += 360;
+            break;
+        case 'decreasing':
+            if (h1 < h2)
+                h1 += 360;
+            break;
+    }
+    return [h1, h2];
+}
+/**
+ * Mix two colors in the given color space.
+ * @param color1 first color
+ * @param color2 second color
+ * @param options interpolation space, hue method and percentages
+ */
+function colorMix(color1, color2, options) {
+    const { space } = options;
+    const model = typeof space === 'string' ? (0, channels_1.colorModel)(space.toLowerCase()) : space;
+    if (model === null) {
+        fail(`unsupported color space: "${space}"`);
+    }
+    const hueIndex = model.hues.indexOf(true);
+    if (options.hue !== undefined && hueIndex === -1) {
+        fail('hue method requires a polar space');
+    }
+    const method = options.hue ?? 'shorter';
+    // Resolve percentages and the (sub-100%) alpha multiplier.
+    // https://drafts.csswg.org/css-color-5/#color-mix-percent-norm
+    const o1 = options.p1;
+    const o2 = options.p2;
+    if ((o1 !== undefined && !(o1 >= 0 && o1 <= 100)) || (o2 !== undefined && !(o2 >= 0 && o2 <= 100))) {
+        fail('percentages must be within [0%, 100%]');
+    }
+    let p1;
+    let p2;
+    let alphaMultiplier = 1;
+    if (o1 === undefined && o2 === undefined) {
+        p1 = 50;
+        p2 = 50;
+    }
+    else if (o1 === undefined) {
+        p2 = o2;
+        p1 = 100 - p2;
+    }
+    else if (o2 === undefined) {
+        p1 = o1;
+        p2 = 100 - p1;
+    }
+    else {
+        const sum = o1 + o2;
+        if (sum === 0) {
+            fail('percentages must not sum to zero');
+        }
+        if (sum < 100) {
+            alphaMultiplier = sum / 100;
+        }
+        p1 = (o1 / sum) * 100;
+        p2 = (o2 / sum) * 100;
+    }
+    const w1 = p1 / 100;
+    const w2 = p2 / 100;
+    const r1 = (0, bits_1.getRed)(color1), g1 = (0, bits_1.getGreen)(color1), b1 = (0, bits_1.getBlue)(color1);
+    const r2 = (0, bits_1.getRed)(color2), g2 = (0, bits_1.getGreen)(color2), b2 = (0, bits_1.getBlue)(color2);
+    const a1 = (0, bits_1.getAlpha)(color1) / 255;
+    const a2 = (0, bits_1.getAlpha)(color2) / 255;
+    const c1 = model.fromSrgb(r1 / 255, g1 / 255, b1 / 255, CHANNELS_1);
+    const c2 = model.fromSrgb(r2 / 255, g2 / 255, b2 / 255, CHANNELS_2);
+    const hi = hueIndex;
+    if (hi >= 0) {
+        // A powerless hue (achromatic color) is treated as missing and takes the
+        // other color's hue. https://drafts.csswg.org/css-color-4/#interpolation-missing
+        // Achromaticity is detected on the sRGB bytes (exact); the converted
+        // channels carry conversion noise (e.g. white -> lch chroma ~0.02).
+        const missing1 = r1 === g1 && g1 === b1;
+        const missing2 = r2 === g2 && g2 === b2;
+        if (missing1 && !missing2) {
+            c1[hi] = c2[hi];
+        }
+        else if (missing2 && !missing1) {
+            c2[hi] = c1[hi];
+        }
+        const [h1, h2] = adjustHue(c1[hi], c2[hi], method);
+        c1[hi] = h1;
+        c2[hi] = h2;
+    }
+    // Premultiply every non-hue coordinate by its alpha.
+    for (let i = 0; i < 3; i++) {
+        if (i !== hi) {
+            c1[i] *= a1;
+            c2[i] *= a2;
+        }
+    }
+    const mixedAlpha = a1 * w1 + a2 * w2;
+    for (let i = 0; i < 3; i++) {
+        let v = c1[i] * w1 + c2[i] * w2;
+        if (i === hi) {
+            v = normalizeHue(v);
+        }
+        else if (mixedAlpha !== 0) {
+            v /= mixedAlpha; // un-premultiply
+        }
+        c1[i] = v;
+    }
+    const alphaByte = (0, bytes_1.clampByte)(mixedAlpha * alphaMultiplier * 255);
+    return model.toColor(c1[0], c1[1], c1[2], alphaByte);
+}
+//# sourceMappingURL=color-mix.js.map

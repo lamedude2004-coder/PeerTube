@@ -1,0 +1,222 @@
+import { dirDist } from "./dirs.js";
+import { r as isNormalModeEnabled } from "./server-BpRdgMyL.js";
+import { t as DevToolsServer } from "./server-DuL0U-yQ.js";
+import { DEVTOOLS_INSPECTOR_DOCK_ID, DEVTOOLS_VITEPLUS_GROUP_ID } from "@vitejs/devtools-kit/constants";
+import { createInstallLauncher, createPluginFromDevframe } from "@vitejs/devtools-kit/node";
+import { colors } from "devframe/utils/colors";
+import { join, normalize, resolve } from "pathe";
+import process from "node:process";
+import { createInspectDevframe } from "@devframes/plugin-inspect";
+import { createMessagesDevframe } from "@devframes/plugin-messages";
+import { createTerminalsDevframe } from "@devframes/plugin-terminals";
+import { isPackageExists } from "local-pkg";
+//#region src/node/plugins/build.ts
+function DevToolsBuild(options = {}) {
+	let context;
+	let resolvedConfig;
+	return {
+		name: "vite:devtools:build",
+		apply: "build",
+		configResolved(config) {
+			resolvedConfig = config;
+		},
+		async buildStart() {
+			const { createDevToolsContext } = await import("./server-DuL0U-yQ.js").then((n) => n.r);
+			context = await createDevToolsContext(resolvedConfig);
+		},
+		async closeBundle() {
+			console.log(colors.cyan`${"⬢"} Building static Vite DevTools...`);
+			const outDir = options.outDir ? resolve(resolvedConfig.root, options.outDir) : resolve(resolvedConfig.root, resolvedConfig.build.outDir);
+			const { buildStaticDevTools } = await import("./build-static-D52s8PAn.js");
+			await buildStaticDevTools({
+				context,
+				outDir,
+				withApp: true
+			});
+		}
+	};
+}
+//#endregion
+//#region package.json
+var version = "0.4.12";
+//#endregion
+//#region src/node/plugins/auto-hide.ts
+/**
+* Keep a dock entry out of the dock bar while its backing collection is empty.
+*
+* Attaches a live `when` getter to the registered entry that resolves to `'false'`
+* (unconditionally hidden) while `isEmpty()` and `undefined` (visible)
+* otherwise. The hub already re-serializes the dock shared state on every
+* terminal / message change, so the getter is re-read at exactly the right
+* moments — no explicit event subscription needed here.
+*
+* Call this from the `setup(ctx)` hook of the `createPluginFromDevframe` mount,
+* after the auto-derived dock entry has been registered.
+*
+* TODO: once devframe/hub ships first-class support for a functional `when`
+* (`when?: () => string | boolean | undefined`, resolved during dock
+* serialization), this can become a plain `dock: { when: () => ... }` option
+* on `createPluginFromDevframe` and the getter trick can be deleted.
+*/
+function hideDockWhenEmpty(ctx, dockId, isEmpty) {
+	const view = ctx.docks.views.get(dockId);
+	if (!view) return;
+	Object.defineProperty(view, "when", {
+		enumerable: true,
+		configurable: true,
+		get: () => isEmpty() ? "false" : void 0
+	});
+}
+//#endregion
+//#region src/node/plugins/builtin.ts
+const DEVTOOLS_ASSETS_BASE = "/__devtools-assets/";
+const BUILTIN_LAUNCHER_INTEGRATIONS = [
+	{
+		id: "rolldown",
+		pkg: "@vitejs/devtools-rolldown",
+		title: "Rolldown DevTools",
+		icon: `${DEVTOOLS_ASSETS_BASE}rolldown.svg`,
+		groupId: DEVTOOLS_VITEPLUS_GROUP_ID,
+		load: () => import("@vitejs/devtools-rolldown").then((m) => m.DevToolsRolldownUI()),
+		install: [`@vitejs/devtools-rolldown@^${version}`]
+	},
+	{
+		id: "vite",
+		pkg: "@vitejs/devtools-vite",
+		title: "Vite DevTools",
+		icon: `${DEVTOOLS_ASSETS_BASE}vite.svg`,
+		groupId: DEVTOOLS_VITEPLUS_GROUP_ID,
+		load: () => import("@vitejs/devtools-vite").then((m) => m.DevToolsViteUI()),
+		install: [`@vitejs/devtools-vite@^${version}`]
+	},
+	{
+		id: "vitest",
+		pkg: "@vitejs/devtools-vitest",
+		title: "Vitest UI",
+		icon: `${DEVTOOLS_ASSETS_BASE}vitest.svg`,
+		groupId: DEVTOOLS_VITEPLUS_GROUP_ID,
+		load: () => import("@vitejs/devtools-vitest").then((m) => m.DevToolsVitestUI()),
+		install: [
+			"vitest",
+			`@vitejs/devtools-vitest@^${version}`,
+			"@vitest/ui"
+		]
+	},
+	{
+		id: "oxc",
+		pkg: "@vitejs/devtools-oxc",
+		title: "Oxc DevTools",
+		icon: `${DEVTOOLS_ASSETS_BASE}oxc.svg`,
+		groupId: DEVTOOLS_VITEPLUS_GROUP_ID,
+		load: () => import("@vitejs/devtools-oxc/vite").then((m) => m.DevToolsOxc()),
+		install: ["@vitejs/devtools-oxc@latest"]
+	}
+];
+/**
+* Set up the built-in DevTools dock entries (Terminals, Messages, Inspector) and
+* the built-in integration launchers (Rolldown, Vite, Vitest, Oxc).
+*/
+async function DevToolsBuiltin(options) {
+	const plugins = [];
+	if (!options.builtinDevTools) return [];
+	const cwd = resolve(options.cwd ?? process.cwd());
+	const launchers = [];
+	for (const integration of BUILTIN_LAUNCHER_INTEGRATIONS) if (isPackageExists(integration.pkg, { paths: [cwd] })) plugins.push(integration.load());
+	else launchers.push(integration);
+	plugins.push({
+		name: "vite:devtools:builtin",
+		enforce: "pre",
+		devtools: { async setup(ctx) {
+			const plugins = [];
+			const terminalsDevframe = createTerminalsDevframe();
+			const messagesDevframe = createMessagesDevframe();
+			const inspectDevframe = createInspectDevframe({ id: DEVTOOLS_INSPECTOR_DOCK_ID });
+			plugins.push(createPluginFromDevframe(terminalsDevframe, { dock: { category: "~builtin" } }));
+			plugins.push(createPluginFromDevframe(messagesDevframe, {
+				dock: { category: "~builtin" },
+				setup(ctx) {
+					hideDockWhenEmpty(ctx, messagesDevframe.id, () => ctx.messages.entries.size === 0);
+				}
+			}));
+			plugins.push(createPluginFromDevframe(inspectDevframe, { dock: {
+				category: "~builtin",
+				icon: "ph:stethoscope-duotone"
+			} }));
+			for (const integration of launchers) plugins.push(createInstallLauncher({
+				id: integration.id,
+				title: integration.title,
+				icon: integration.icon,
+				groupId: integration.groupId ?? void 0,
+				install: integration.install,
+				label: integration.title,
+				pkg: integration.pkg
+			}));
+			for (const plugin of plugins) await plugin.devtools?.setup?.(ctx);
+		} }
+	});
+	return Promise.all(plugins).then((arr) => arr.flat(Infinity));
+}
+//#endregion
+//#region src/node/plugins/injection.ts
+const ENTRY_BY_MODE = {
+	normal: "inject",
+	passive: "inject-passive",
+	hidden: "inject-hidden"
+};
+function virtualId(mode) {
+	return `virtual:vite-devtools-injection:${mode}`;
+}
+function resolveDevToolsInjectionEntry(mode) {
+	const name = ENTRY_BY_MODE[mode];
+	return process.env.VITE_DEVTOOLS_LOCAL_DEV ? normalize(join(dirDist, "..", `src/client/${name}/index.ts`)) : normalize(join(dirDist, `client/${name}.js`));
+}
+function DevToolsInjection(options = {}) {
+	const visibility = options.visibility ?? "normal";
+	let root = process.cwd();
+	const resolveMode = () => {
+		if (visibility === "normal") return "normal";
+		if (visibility === "hidden") return "hidden";
+		return isNormalModeEnabled(root) ? "normal" : "passive";
+	};
+	return {
+		name: "vite:devtools:injection",
+		enforce: "post",
+		apply(_config, env) {
+			return env.command === "serve" && !env.isSsrBuild;
+		},
+		configResolved(config) {
+			root = config.root;
+		},
+		transformIndexHtml: {
+			order: "pre",
+			handler() {
+				return [{
+					tag: "script",
+					attrs: { type: "module" },
+					children: `import ${JSON.stringify(virtualId(resolveMode()))}`,
+					injectTo: "body"
+				}];
+			}
+		},
+		resolveId(id) {
+			for (const mode of Object.keys(ENTRY_BY_MODE)) if (id === virtualId(mode)) return `\0${id}`;
+		},
+		load(id) {
+			for (const mode of Object.keys(ENTRY_BY_MODE)) if (id === `\0${virtualId(mode)}`) return `import(${JSON.stringify(resolveDevToolsInjectionEntry(mode))})\n`;
+		}
+	};
+}
+//#endregion
+//#region src/node/plugins/index.ts
+async function DevTools(options = {}) {
+	const { builtinDevTools = true, build, visibility = "normal" } = options;
+	const plugins = [DevToolsInjection({ visibility }), DevToolsServer()];
+	if (build?.withApp) plugins.push(DevToolsBuild({ outDir: build.outDir }));
+	plugins.unshift(...await DevToolsBuiltin({
+		cwd: options.cwd,
+		builtinDevTools
+	}));
+	return plugins;
+}
+//#endregion
+export { DevTools as t };

@@ -1,0 +1,376 @@
+import { r as __exportAll } from "./dist-DQIEKbWS.js";
+import { dirAssets } from "./dirs.js";
+import { i as getAuthHandler, t as createDevToolsMiddleware } from "./server-BpRdgMyL.js";
+import { n as diagnostics } from "./constants-CIqKszXr.js";
+import { DEVTOOLS_DOCK_IMPORTS_VIRTUAL_ID, DEVTOOLS_MOUNT_PATH, DEVTOOLS_MOUNT_PATH_NO_TRAILING_SLASH, DEVTOOLS_VITEPLUS_GROUP_ID } from "@vitejs/devtools-kit/constants";
+import { createKitContext, createViteDevToolsHost } from "@vitejs/devtools-kit/node";
+import { isObject } from "devframe/node";
+import { createDebug } from "obug";
+import { relative, resolve } from "node:path";
+import { defineRpcFunction } from "@vitejs/devtools-kit";
+import { launchEditor } from "devframe/utils/launch-editor";
+import { open } from "devframe/utils/open";
+//#region src/node/rpc/internal/commands-execute.ts
+const commandsExecute = defineRpcFunction({
+	name: "devtoolskit:internal:commands:execute",
+	type: "action",
+	setup: (context) => {
+		return { async handler(id, ...args) {
+			return context.commands.execute(id, ...args);
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/commands-list.ts
+const commandsList = defineRpcFunction({
+	name: "devtoolskit:internal:commands:list",
+	type: "static",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { async handler() {
+			return context.commands.list();
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/docks-on-launch.ts
+const docksOnLaunch = defineRpcFunction({
+	name: "devtoolskit:internal:docks:on-launch",
+	type: "action",
+	setup: (context) => {
+		const launchMap = /* @__PURE__ */ new Map();
+		return { handler: async (entryId, payload) => {
+			if (launchMap.has(entryId)) return launchMap.get(entryId);
+			const entry = context.docks.values().find((entry) => entry.id === entryId);
+			if (!entry) throw diagnostics.DTK0030({ id: entryId });
+			if (entry.type !== "launcher") throw diagnostics.DTK0031({ id: entryId });
+			const run = (async () => {
+				try {
+					context.docks.update({
+						...entry,
+						launcher: {
+							...entry.launcher,
+							status: "loading",
+							error: void 0
+						}
+					});
+					const { onLaunch, command } = entry.launcher;
+					const result = onLaunch ? await onLaunch(payload) : command ? await context.commands.execute(command, payload) : void 0;
+					const newEntry = context.docks.values().find((entry) => entry.id === entryId) || entry;
+					if (newEntry.type === "launcher") context.docks.update({
+						...newEntry,
+						launcher: {
+							...newEntry.launcher,
+							status: "success"
+						}
+					});
+					return result;
+				} catch (error) {
+					diagnostics.DTK0032({
+						id: entryId,
+						cause: error
+					});
+					const newEntry = context.docks.values().find((entry) => entry.id === entryId) || entry;
+					if (newEntry.type === "launcher") context.docks.update({
+						...newEntry,
+						launcher: {
+							...newEntry.launcher,
+							status: "error",
+							error: error instanceof Error ? error.message : String(error)
+						}
+					});
+				}
+			})();
+			launchMap.set(entryId, run);
+			try {
+				return await run;
+			} finally {
+				launchMap.delete(entryId);
+			}
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/messages-add.ts
+const messagesAdd = defineRpcFunction({
+	name: "devtoolskit:internal:messages:add",
+	type: "action",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { async handler(input) {
+			return (await context.messages.add({
+				...input,
+				from: "browser"
+			})).entry;
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/messages-clear.ts
+const messagesClear = defineRpcFunction({
+	name: "devtoolskit:internal:messages:clear",
+	type: "action",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { async handler() {
+			await context.messages.clear();
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/messages-list.ts
+const messagesList = defineRpcFunction({
+	name: "devtoolskit:internal:messages:list",
+	type: "static",
+	jsonSerializable: true,
+	setup: (context) => {
+		const host = context.messages;
+		return { async handler(since) {
+			const currentVersion = host._clock;
+			if (since == null) return {
+				entries: Array.from(host.entries.values()),
+				removedIds: [],
+				version: currentVersion
+			};
+			const entries = [];
+			for (const [id, entry] of host.entries) {
+				const mod = host.lastModified?.get(id);
+				if (mod != null && mod > since) entries.push(entry);
+			}
+			const removedIds = [];
+			const removals = host.removals;
+			for (const r of removals) if (r.time > since) removedIds.push(r.id);
+			const pruneThreshold = since;
+			while (removals.length > 0 && removals[0].time <= pruneThreshold) removals.shift();
+			return {
+				entries,
+				removedIds,
+				version: currentVersion
+			};
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/messages-remove.ts
+const messagesRemove = defineRpcFunction({
+	name: "devtoolskit:internal:messages:remove",
+	type: "action",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { async handler(id) {
+			await context.messages.remove(id);
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/messages-update.ts
+const messagesUpdate = defineRpcFunction({
+	name: "devtoolskit:internal:messages:update",
+	type: "action",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { async handler(id, patch) {
+			return await context.messages.update(id, patch) ?? null;
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/internal/rpc-server-list.ts
+const rpcServerList = defineRpcFunction({
+	name: "devtoolskit:internal:rpc:server:list",
+	type: "static",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { async handler() {
+			return Object.fromEntries(Array.from(context.rpc.definitions.entries()).map(([name, fn]) => [name, {
+				type: fn.type,
+				cacheable: fn.cacheable || false
+			}]));
+		} };
+	}
+});
+//#endregion
+//#region src/node/rpc/index.ts
+const builtinPublicRpcDeclarations = [defineRpcFunction({
+	name: "vite:core:open-in-editor",
+	type: "action",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { handler: async (path) => {
+			const resolved = resolve(context.workspaceRoot, path);
+			const rel = relative(context.workspaceRoot, resolved);
+			if (rel.startsWith("..") || rel.includes("\0")) throw diagnostics.DTK0028();
+			launchEditor(resolved);
+		} };
+	}
+}), defineRpcFunction({
+	name: "vite:core:open-in-finder",
+	type: "action",
+	jsonSerializable: true,
+	setup: (context) => {
+		return { handler: async (path) => {
+			const resolved = resolve(context.workspaceRoot, path);
+			const rel = relative(context.workspaceRoot, resolved);
+			if (rel.startsWith("..") || rel.includes("\0")) throw diagnostics.DTK0029();
+			await open(resolved);
+		} };
+	}
+})];
+const builtinInternalRpcDeclarations = [
+	commandsExecute,
+	commandsList,
+	docksOnLaunch,
+	messagesAdd,
+	messagesClear,
+	messagesList,
+	messagesRemove,
+	messagesUpdate,
+	rpcServerList
+];
+const builtinRpcDeclarations = [...builtinPublicRpcDeclarations, ...builtinInternalRpcDeclarations];
+//#endregion
+//#region src/node/context.ts
+var context_exports = /* @__PURE__ */ __exportAll({ createDevToolsContext: () => createDevToolsContext });
+const debugSetup = createDebug("vite:devtools:context:setup");
+function shouldSkipSetupByCapabilities(plugin, mode) {
+	const modeCapabilities = plugin.devtools?.capabilities?.[mode];
+	if (modeCapabilities === false) return true;
+	if (!isObject(modeCapabilities)) return false;
+	return Object.values(modeCapabilities).includes(false);
+}
+async function createDevToolsContext(viteConfig, viteServer) {
+	const cwd = viteConfig.root;
+	const { searchForWorkspaceRoot } = await import("vite");
+	const mode = viteConfig.command === "serve" ? "dev" : "build";
+	const workspaceRoot = searchForWorkspaceRoot(cwd) ?? cwd;
+	const context = await createKitContext({
+		cwd,
+		workspaceRoot,
+		mode,
+		host: createViteDevToolsHost({
+			viteConfig,
+			viteServer,
+			workspaceRoot
+		}),
+		builtinRpcDeclarations,
+		viteConfig,
+		viteServer
+	});
+	context.diagnostics.register(diagnostics);
+	context.docks.register({
+		type: "~builtin",
+		id: "~settings",
+		category: "~builtin",
+		title: "Settings",
+		icon: "ph:gear-duotone",
+		defaultOrder: 1e6
+	});
+	const rpcHost = context.rpc;
+	for (const fn of getAuthHandler(context).rpcFunctions) rpcHost.register(fn);
+	context.commands.register({
+		id: "vite:open-in-editor",
+		title: "Open in Editor",
+		icon: "ph:pencil-duotone",
+		category: "editor",
+		showInPalette: false,
+		handler: (path) => rpcHost.invokeLocal("vite:core:open-in-editor", path)
+	});
+	context.commands.register({
+		id: "vite:open-in-finder",
+		title: "Open in Finder",
+		icon: "ph:folder-open-duotone",
+		category: "editor",
+		showInPalette: false,
+		handler: (path) => rpcHost.invokeLocal("vite:core:open-in-finder", path)
+	});
+	context.docks.register({
+		id: DEVTOOLS_VITEPLUS_GROUP_ID,
+		type: "group",
+		title: "Vite+",
+		category: "framework",
+		icon: {
+			light: "builtin:vite-plus-core",
+			dark: "builtin:vite-plus-core"
+		}
+	});
+	if (viteServer || mode === "build") context.views.hostStatic("/__devtools-assets/", dirAssets);
+	const plugins = viteConfig.plugins.filter((plugin) => "devtools" in plugin);
+	for (const plugin of plugins) {
+		if (!plugin.devtools?.setup) continue;
+		if (shouldSkipSetupByCapabilities(plugin, mode)) {
+			debugSetup(`skipping plugin ${JSON.stringify(plugin.name)} due to disabled capabilities in ${mode} mode`);
+			continue;
+		}
+		try {
+			debugSetup(`setting up plugin ${JSON.stringify(plugin.name)}`);
+			await plugin.devtools?.setup?.(context);
+		} catch (error) {
+			throw diagnostics.DTK0014({
+				name: plugin.name,
+				cause: error
+			});
+		}
+	}
+	return context;
+}
+//#endregion
+//#region src/node/plugins/server.ts
+var server_exports = /* @__PURE__ */ __exportAll({
+	DevToolsServer: () => DevToolsServer,
+	renderDockImportsMap: () => renderDockImportsMap
+});
+/**
+* Core plugin for enabling Vite DevTools
+*/
+function renderDockImportsMap(docks) {
+	const map = /* @__PURE__ */ new Map();
+	for (const dock of docks) {
+		const id = `${dock.type}:${dock.id}`;
+		if (dock.type === "action") map.set(id, dock.action);
+		else if (dock.type === "custom-render") map.set(id, dock.renderer);
+		else if (dock.type === "iframe" && dock.clientScript) map.set(id, dock.clientScript);
+	}
+	return [
+		`export const importsMap = {`,
+		...[...map.entries()].filter(([, entry]) => entry != null).map(([id, { importFrom, importName }]) => `  [${JSON.stringify(id)}]: () => import(${JSON.stringify(importFrom)}).then(r => r[${JSON.stringify(importName ?? "default")}]),`),
+		"}"
+	].join("\n");
+}
+function DevToolsServer() {
+	let context;
+	return {
+		name: "vite:devtools:server",
+		enforce: "post",
+		apply: "serve",
+		async configureServer(viteDevServer) {
+			context = await createDevToolsContext(viteDevServer.config, viteDevServer);
+			const host = viteDevServer.config.server.host === true ? "0.0.0.0" : viteDevServer.config.server.host || "localhost";
+			const { middleware } = await createDevToolsMiddleware({
+				cwd: viteDevServer.config.root,
+				websocket: { host },
+				context
+			});
+			viteDevServer.middlewares.use((req, res, next) => {
+				if (req.url === DEVTOOLS_MOUNT_PATH_NO_TRAILING_SLASH || req.url?.startsWith(`${DEVTOOLS_MOUNT_PATH_NO_TRAILING_SLASH}?`)) {
+					res.statusCode = 302;
+					res.setHeader("Location", `${DEVTOOLS_MOUNT_PATH}${req.url.slice(DEVTOOLS_MOUNT_PATH_NO_TRAILING_SLASH.length)}`);
+					res.end();
+					return;
+				}
+				next();
+			});
+			viteDevServer.middlewares.use(DEVTOOLS_MOUNT_PATH, middleware);
+		},
+		resolveId(id) {
+			if (id === DEVTOOLS_DOCK_IMPORTS_VIRTUAL_ID) return id;
+		},
+		load(id) {
+			if (id === DEVTOOLS_DOCK_IMPORTS_VIRTUAL_ID) {
+				if (!context) throw new Error("DevTools context is not initialized");
+				return renderDockImportsMap(context.docks.values());
+			}
+		}
+	};
+}
+//#endregion
+export { createDevToolsContext as i, server_exports as n, context_exports as r, DevToolsServer as t };

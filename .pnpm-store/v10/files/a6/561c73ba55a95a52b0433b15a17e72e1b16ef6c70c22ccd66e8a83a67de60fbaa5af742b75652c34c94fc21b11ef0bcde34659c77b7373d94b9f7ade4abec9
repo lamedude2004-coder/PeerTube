@@ -1,0 +1,37 @@
+import type { Redis, RedisOptions } from 'ioredis';
+import { File } from './file';
+import { MetaStorage, MetaStorageOptions, UploadList } from './meta-storage';
+/**
+ * Redis connection and metadata storage options
+ */
+export interface RedisMetaStorageOptions extends MetaStorageOptions, RedisOptions {
+}
+/**
+ * Redis-backed upload metadata storage
+ * @example
+ * ```ts
+ * import { RedisMetaStorage, uploadx } from '@uploadx/core';
+ *
+ * app.use(
+ *   '/files',
+ *   uploadx({
+ *     uploadDir: 'upload',
+ *     metaStorage: new RedisMetaStorage({ host: 'localhost', port: 6379 })
+ *   })
+ * );
+ * ```
+ */
+export declare class RedisMetaStorage<T extends File = File> extends MetaStorage<T> {
+    readonly options: RedisMetaStorageOptions;
+    client: Redis;
+    constructor(options?: RedisMetaStorageOptions);
+    save(id: string, file: T): Promise<T>;
+    touch(id: string, file: T): Promise<T>;
+    get(id: string): Promise<T>;
+    delete(id: string): Promise<void>;
+    close(): Promise<void>;
+    list(prefix?: string): Promise<UploadList>;
+    toString(): string;
+    private key;
+    private fetchItems;
+}

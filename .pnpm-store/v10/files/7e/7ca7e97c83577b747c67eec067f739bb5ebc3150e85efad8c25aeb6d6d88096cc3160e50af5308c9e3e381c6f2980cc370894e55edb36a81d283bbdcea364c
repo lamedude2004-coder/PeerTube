@@ -1,0 +1,1074 @@
+import { S as css_default, a as getEntryPaneKey, c as _sfc_main$9, d as _sfc_main$13, g as _sfc_main$14, i as _sfc_main$11, l as openDockContextMenu, m as _sfc_main$16, o as useIframePanes, p as _sfc_main$15, r as _sfc_main$10, s as _sfc_main$8, t as DockStandalone, u as _sfc_main$12, v as VitePlusCore_default, x as useIsRpcTrusted, y as export_helper_default } from "../DockStandalone-DuyhxxLQ.js";
+import { $ as useScreenSafeArea, C as setEdgePositionDropdown, D as useDocksOverflowPanel, H as createDockEntryState, K as BUILTIN_ENTRY_CLIENT_AUTH_NOTICE, U as sharedStateToRef, V as DEFAULT_DOCK_PANEL_STORE, W as useDocksEntries, X as useElementBounding, Z as useEventListener, a as getEntryGroup, f as closeDockPopup, it as whenever, k as useEdgePositionDropdown, r as docksSplitGroupsWithCapacity, rt as watchDebounced, tt as useWindowSize, v as useIsDockPopupOpen, w as setFloatingTooltip, x as setDocksOverflowPanel } from "../dock-settings-Dkjacx5p.js";
+import { Fragment, computed, createBlock, createCommentVNode, createElementBlock, createElementVNode, createVNode, defineComponent, defineCustomElement, h, normalizeClass, normalizeStyle, onMounted, onUnmounted, openBlock, reactive, ref, renderSlot, toRefs, unref, useTemplateRef, vShow, watch, withCtx, withDirectives, withModifiers } from "vue";
+//#region src/client/webcomponents/components/icons/BracketLeft.vue
+const _sfc_main$7 = {};
+const _hoisted_1$4 = {
+	viewBox: "0 0 9 20",
+	fill: "none",
+	xmlns: "http://www.w3.org/2000/svg"
+};
+function _sfc_render$1(_ctx, _cache) {
+	return openBlock(), createElementBlock("svg", _hoisted_1$4, [..._cache[0] || (_cache[0] = [createElementVNode("path", {
+		d: "M4.95763 0C1.02563 5.628 1.00263 14.351 4.95763 20H7.61363C3.65963 14.35 3.68363 5.627 7.61363 0H4.95763Z",
+		class: "fill-black dark:fill-white"
+	}, null, -1)])]);
+}
+var BracketLeft_default = /*#__PURE__*/ export_helper_default(_sfc_main$7, [["render", _sfc_render$1]]);
+//#endregion
+//#region src/client/webcomponents/components/icons/BracketRight.vue
+const _sfc_main$6 = {};
+const _hoisted_1$3 = {
+	viewBox: "0 0 9 20",
+	fill: "none",
+	xmlns: "http://www.w3.org/2000/svg"
+};
+function _sfc_render(_ctx, _cache) {
+	return openBlock(), createElementBlock("svg", _hoisted_1$3, [..._cache[0] || (_cache[0] = [createElementVNode("path", {
+		d: "M4.246 10H6.903C6.902 6.407 5.913 2.816 3.946 0H1.29C3.256 2.816 4.244 6.407 4.246 10ZM8.935 14.907H6.27C6.46624 14.1665 6.61752 13.4148 6.723 12.656H4.066C3.96052 13.4148 3.80924 14.1665 3.613 14.907H0.944C0.703507 15.8176 0.387753 16.7067 0 17.565H2.669C2.2859 18.4179 1.82388 19.2331 1.289 20H3.945C4.47988 19.2331 4.9419 18.4179 5.325 17.565H7.99C8.376 16.714 8.691 15.823 8.935 14.907Z",
+		class: "fill-black dark:fill-white"
+	}, null, -1)])]);
+}
+var BracketRight_default = /*#__PURE__*/ export_helper_default(_sfc_main$6, [["render", _sfc_render]]);
+//#endregion
+//#region src/client/webcomponents/components/dock/dock-layout.ts
+/** The built-in dock layout. Override individual fields via {@link resolveDockLayout}. */
+const DEFAULT_DOCK_LAYOUT = Object.freeze({
+	barHeight: 34,
+	barMinWidth: 100,
+	minimizedSize: 22,
+	glowSize: 160,
+	glowBlur: 60,
+	maxVisibleItems: 5,
+	viewportMargin: 2,
+	panelOverlapFactor: -.04,
+	edgeSnapPercent: 5,
+	centerSnapPercent: 2,
+	edgeZoneHeight: 70
+});
+/** Merge partial overrides over {@link DEFAULT_DOCK_LAYOUT}. */
+function resolveDockLayout(overrides) {
+	if (!overrides) return DEFAULT_DOCK_LAYOUT;
+	return {
+		...DEFAULT_DOCK_LAYOUT,
+		...overrides
+	};
+}
+/**
+* Project a layout's dimension fields to the CSS custom properties consumed by
+* `style.css`. Bind the result on the `#vite-devtools-anchor` root so the
+* values cascade to the bar, minimized nub and glow.
+*/
+function dockLayoutCssVars(layout) {
+	return {
+		"--vite-devtools-dock-height": `${layout.barHeight}px`,
+		"--vite-devtools-dock-min-width": `${layout.barMinWidth}px`,
+		"--vite-devtools-dock-minimized-size": `${layout.minimizedSize}px`,
+		"--vite-devtools-dock-glow-size": `${layout.glowSize}px`,
+		"--vite-devtools-dock-glow-blur": `${layout.glowBlur}px`
+	};
+}
+/**
+* Add the viewport margin on top of the device safe-area insets, yielding the
+* effective per-side spacing the bar and its panel keep from the viewport edge.
+*/
+function resolveViewportMargins(safeArea, layout) {
+	return {
+		left: safeArea.left + layout.viewportMargin,
+		top: safeArea.top + layout.viewportMargin,
+		right: safeArea.right + layout.viewportMargin,
+		bottom: safeArea.bottom + layout.viewportMargin
+	};
+}
+/**
+* Snap a `0`–`100` viewport percentage toward the nearest edge (`0` / `100`) or
+* the center (`50`) when it falls inside the configured snap zones.
+*/
+function snapDockPercent(value, layout) {
+	if (value < layout.edgeSnapPercent) return 0;
+	if (value > 100 - layout.edgeSnapPercent) return 100;
+	if (Math.abs(value - 50) < layout.centerSnapPercent) return 50;
+	return value;
+}
+/**
+* Decide which viewport edge a dragged point belongs to, by comparing the angle
+* from the viewport center against the four corner angles (offset inward by
+* {@link DockLayout.edgeZoneHeight}).
+*/
+function resolveDockEdge(params) {
+	const { x, y, viewportWidth, viewportHeight, layout } = params;
+	const centerX = viewportWidth / 2;
+	const centerY = viewportHeight / 2;
+	const zone = layout.edgeZoneHeight;
+	const deg = Math.atan2(y - centerY, x - centerX);
+	const tl = Math.atan2(0 - centerY + zone, 0 - centerX);
+	const tr = Math.atan2(0 - centerY + zone, viewportWidth - centerX);
+	const bl = Math.atan2(viewportHeight - zone - centerY, 0 - centerX);
+	const br = Math.atan2(viewportHeight - zone - centerY, viewportWidth - centerX);
+	if (deg >= tl && deg <= tr) return "top";
+	if (deg >= tr && deg <= br) return "right";
+	if (deg >= br && deg <= bl) return "bottom";
+	return "left";
+}
+function clamp(value, min, max) {
+	return Math.min(Math.max(value, min), max);
+}
+/**
+* Resolve the pixel anchor (the center point of the bar) for a given edge.
+*
+* The axis pinned to the edge is offset by half the bar's cross-size plus the
+* viewport margin; the free axis is driven by the stored percentage and clamped
+* so the bar stays fully inside the viewport margins.
+*/
+function resolveDockAnchor(params) {
+	const { edge, leftPercent, topPercent, viewportWidth, viewportHeight, dockWidth, dockHeight, margins } = params;
+	const halfWidth = dockWidth / 2;
+	const halfHeight = dockHeight / 2;
+	const left = leftPercent * viewportWidth / 100;
+	const top = topPercent * viewportHeight / 100;
+	switch (edge) {
+		case "top": return {
+			left: clamp(left, halfWidth + margins.left, viewportWidth - halfWidth - margins.right),
+			top: margins.top + halfHeight
+		};
+		case "right": return {
+			left: viewportWidth - margins.right - halfHeight,
+			top: clamp(top, halfWidth + margins.top, viewportHeight - halfWidth - margins.bottom)
+		};
+		case "left": return {
+			left: margins.left + halfHeight,
+			top: clamp(top, halfWidth + margins.top, viewportHeight - halfWidth - margins.bottom)
+		};
+		default: return {
+			left: clamp(left, halfWidth + margins.left, viewportWidth - halfWidth - margins.right),
+			top: viewportHeight - margins.bottom - halfHeight
+		};
+	}
+}
+//#endregion
+//#region src/client/webcomponents/components/dock/DockOverflowButton.vue
+const _sfc_main$5 = /*@__PURE__*/ defineComponent({
+	__name: "DockOverflowButton",
+	props: {
+		context: {},
+		isVertical: { type: Boolean },
+		groups: {},
+		selected: {}
+	},
+	emits: ["select", "activity"],
+	setup(__props, { emit: __emit }) {
+		const props = __props;
+		const emit = __emit;
+		const overflowButton = useTemplateRef("overflowButton");
+		const overflowBadge = computed(() => {
+			const count = props.groups.reduce((acc, [_, items]) => acc + items.length, 0);
+			if (count > 9) return "9+";
+			return count.toString();
+		});
+		const isOverflowPanelVisible = ref(false);
+		const docksOverflowPanel = useDocksOverflowPanel();
+		function showOverflowPanel() {
+			if (!overflowButton.value) return;
+			isOverflowPanelVisible.value = true;
+			setDocksOverflowPanel({
+				content: () => h("div", {
+					class: "flex gap-0 flex-wrap max-w-220px",
+					onMousemove: () => emit("activity")
+				}, [h(_sfc_main$8, {
+					context: props.context,
+					groups: props.groups,
+					isVertical: false,
+					selected: props.selected,
+					onSelect: (e) => {
+						emit("select", e);
+						hideOverflowPanel();
+					}
+				})]),
+				el: overflowButton.value
+			});
+		}
+		watchDebounced(() => docksOverflowPanel.value, (value) => {
+			isOverflowPanelVisible.value = !!value;
+		}, { debounce: 1e3 });
+		function toggleOverflowPanel() {
+			if (isOverflowPanelVisible.value) hideOverflowPanel();
+			else showOverflowPanel();
+		}
+		function hideOverflowPanel() {
+			isOverflowPanelVisible.value = false;
+			setDocksOverflowPanel(null);
+		}
+		return (_ctx, _cache) => {
+			return openBlock(), createElementBlock("div", {
+				ref_key: "overflowButton",
+				ref: overflowButton
+			}, [createVNode(_sfc_main$9, {
+				context: __props.context,
+				dock: {
+					id: "overflow",
+					title: "Overflow",
+					icon: "ph:dots-three-circle-duotone"
+				},
+				class: "overflow-button",
+				tooltip: false,
+				badge: overflowBadge.value,
+				"is-vertical": __props.isVertical,
+				"is-selected": false,
+				"is-dimmed": false,
+				onClick: toggleOverflowPanel
+			}, null, 8, [
+				"context",
+				"badge",
+				"is-vertical"
+			])], 512);
+		};
+	}
+});
+//#endregion
+//#region src/client/webcomponents/components/dock/Dock.vue
+const _hoisted_1$2 = {
+	key: 0,
+	class: "i-fluent-emoji-flat-warning absolute bottom-0 right--1px w-1.5 h-1.5"
+};
+const _hoisted_2$1 = { class: "flex items-center gap-1" };
+const _sfc_main$4 = /*@__PURE__*/ defineComponent({
+	__name: "Dock",
+	props: {
+		context: {},
+		layout: {}
+	},
+	setup(__props) {
+		const props = __props;
+		const context = props.context;
+		const layout = computed(() => resolveDockLayout(props.layout));
+		const isSafari = navigator.userAgent.includes("Safari") && !navigator.userAgent.includes("Chrome");
+		const safeArea = useScreenSafeArea();
+		function toNumber(value) {
+			const num = +value;
+			if (Number.isNaN(num)) return 0;
+			return num;
+		}
+		const panelMargins = computed(() => resolveViewportMargins({
+			left: toNumber(safeArea.left.value),
+			top: toNumber(safeArea.top.value),
+			right: toNumber(safeArea.right.value),
+			bottom: toNumber(safeArea.bottom.value)
+		}, layout.value));
+		const dockEl = useTemplateRef("dockEl");
+		const anchorEl = useTemplateRef("anchorEl");
+		const recalculateCounter = ref(0);
+		const isHovering = ref(false);
+		const windowSize = reactive({
+			width: window.innerWidth,
+			height: window.innerHeight
+		});
+		const draggingOffset = reactive({
+			x: 0,
+			y: 0
+		});
+		const mousePosition = reactive({
+			x: 0,
+			y: 0
+		});
+		function onPointerDown(e) {
+			if (!dockEl.value) return;
+			context.panel.isDragging = true;
+			const { left, top, width, height } = dockEl.value.getBoundingClientRect();
+			draggingOffset.x = e.clientX - left - width / 2;
+			draggingOffset.y = e.clientY - top - height / 2;
+		}
+		const isRpcTrusted = useIsRpcTrusted(context, (isTrusted) => {
+			if (isTrusted && context.docks.selected?.id === BUILTIN_ENTRY_CLIENT_AUTH_NOTICE.id) context.docks.switchEntry(null);
+			else if (!isTrusted) {
+				context.docks.switchEntry(null);
+				context.panel.store.open = false;
+			}
+		});
+		const groupedEntries = computed(() => context.docks.groupedEntries);
+		const splitEntries = computed(() => {
+			return docksSplitGroupsWithCapacity(groupedEntries.value, layout.value.maxVisibleItems);
+		});
+		const selectedEntry = computed(() => {
+			return context.docks.selected;
+		});
+		onMounted(async () => {
+			windowSize.width = window.innerWidth;
+			windowSize.height = window.innerHeight;
+			useEventListener(window, "resize", () => {
+				windowSize.width = window.innerWidth;
+				windowSize.height = window.innerHeight;
+			});
+			useEventListener(window, "pointermove", (e) => {
+				if (!context.panel.isDragging) return;
+				const store = context.panel.store;
+				const x = e.clientX - draggingOffset.x;
+				const y = e.clientY - draggingOffset.y;
+				if (Number.isNaN(x) || Number.isNaN(y)) return;
+				mousePosition.x = x;
+				mousePosition.y = y;
+				store.position = resolveDockEdge({
+					x,
+					y,
+					viewportWidth: window.innerWidth,
+					viewportHeight: window.innerHeight,
+					layout: layout.value
+				});
+				store.left = snapDockPercent(x / window.innerWidth * 100, layout.value);
+				store.top = snapDockPercent(y / window.innerHeight * 100, layout.value);
+			});
+			useEventListener(window, "pointerup", () => {
+				context.panel.isDragging = false;
+			});
+			useEventListener(window, "pointerleave", () => {
+				context.panel.isDragging = false;
+			});
+		});
+		const anchorPos = computed(() => {
+			recalculateCounter.value;
+			const store = context.panel.store;
+			return resolveDockAnchor({
+				edge: store.position,
+				leftPercent: store.left,
+				topPercent: store.top,
+				viewportWidth: windowSize.width,
+				viewportHeight: windowSize.height,
+				dockWidth: dockEl.value?.clientWidth || 0,
+				dockHeight: dockEl.value?.clientHeight || 0,
+				margins: panelMargins.value
+			});
+		});
+		let _timer = null;
+		function bringUp() {
+			isHovering.value = true;
+			if (context.panel.store.inactiveTimeout < 0) return;
+			if (_timer) clearTimeout(_timer);
+			_timer = setTimeout(() => {
+				isHovering.value = false;
+			}, +context.panel.store.inactiveTimeout || 0);
+		}
+		const isHidden = computed(() => false);
+		const isMinimized = computed(() => {
+			if (context.panel.store.inactiveTimeout < 0) return false;
+			if (context.panel.store.inactiveTimeout === 0) return true;
+			const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+			return !context.panel.isDragging && !context.panel.store.open && !isHovering.value && !isTouchDevice && context.panel.store.inactiveTimeout;
+		});
+		const anchorStyle = computed(() => {
+			return {
+				...dockLayoutCssVars(layout.value),
+				left: `${anchorPos.value.left}px`,
+				top: `${anchorPos.value.top}px`,
+				pointerEvents: isHidden.value ? "none" : "auto"
+			};
+		});
+		const panelStyle = computed(() => {
+			const style = { transform: context.panel.isVertical ? `translate(-50%, -50%) rotate(90deg)` : `translate(-50%, -50%)` };
+			if (isHidden.value) {
+				style.opacity = 0;
+				style.pointerEvents = "none";
+			}
+			if (context.panel.isDragging) style.transition = "none !important";
+			return style;
+		});
+		whenever(isMinimized, () => {
+			setDocksOverflowPanel(null);
+		});
+		onMounted(() => {
+			if (context.panel.store.open && !isRpcTrusted.value) context.panel.store.open = false;
+			if (isRpcTrusted.value) bringUp();
+			recalculateCounter.value++;
+		});
+		return (_ctx, _cache) => {
+			return openBlock(), createElementBlock("div", {
+				id: "vite-devtools-anchor",
+				ref_key: "anchorEl",
+				ref: anchorEl,
+				style: normalizeStyle([anchorStyle.value]),
+				class: normalizeClass([{
+					"vite-devtools-horizontal": !unref(context).panel.isVertical,
+					"vite-devtools-vertical": unref(context).panel.isVertical,
+					"vite-devtools-minimized": isMinimized.value
+				}, "color-base"]),
+				onMousemove: bringUp
+			}, [
+				!unref(isSafari) ? (openBlock(), createElementBlock("div", {
+					key: 0,
+					id: "vite-devtools-glowing",
+					class: normalizeClass(unref(context).panel.isDragging ? "op60!" : "")
+				}, null, 2)) : createCommentVNode("v-if", true),
+				renderSlot(_ctx.$slots, "default", {
+					context: unref(context),
+					dockEl: dockEl.value,
+					selected: unref(context).docks.selected,
+					panelMargins: panelMargins.value,
+					layout: layout.value
+				}),
+				createElementVNode("div", {
+					id: "vite-devtools-dock-container",
+					ref_key: "dockEl",
+					ref: dockEl,
+					style: normalizeStyle(panelStyle.value)
+				}, [createElementVNode("div", {
+					id: "vite-devtools-dock",
+					onPointerdown: onPointerDown
+				}, [
+					createVNode(BracketLeft_default, { class: "vite-devtools-dock-bracket absolute left--1 top-1/2 translate-y--1/2 bottom-0 w-2.5 op75 transition-opacity duration-300" }),
+					createVNode(BracketRight_default, { class: normalizeClass(["vite-devtools-dock-bracket absolute right--1 top-1/2 translate-y--1/2 bottom-0 w-2.5 op75 transition-opacity duration-300", unref(context).panel.isVertical ? "scale-y--100" : ""]) }, null, 8, ["class"]),
+					createElementVNode("div", { class: normalizeClass(["w-3 h-3 absolute left-1/2 top-1/2 translate-x--1/2 translate-y--1/2 transition-opacity duration-300", [isMinimized.value ? "op100" : "op0", unref(context).panel.isVertical ? "rotate-270" : "rotate-0"]]) }, [createVNode(VitePlusCore_default), !unref(isRpcTrusted) ? (openBlock(), createElementBlock("div", _hoisted_1$2)) : createCommentVNode("v-if", true)], 2),
+					!unref(isRpcTrusted) ? (openBlock(), createElementBlock("div", {
+						key: 0,
+						class: normalizeClass(["transition duration-300 delay-200", isMinimized.value ? "opacity-0 pointer-events-none ws-nowrap text-sm text-orange of-hidden" : "opacity-100"])
+					}, [createElementVNode("button", {
+						class: "p2 transition hover:bg-active rounded-full px4",
+						onClick: _cache[0] || (_cache[0] = ($event) => unref(context).docks.toggleEntry(unref(BUILTIN_ENTRY_CLIENT_AUTH_NOTICE).id))
+					}, [createElementVNode("div", _hoisted_2$1, [createElementVNode("div", { class: normalizeClass(["i-fluent-emoji-flat-warning flex-none", unref(context).panel.isVertical ? "rotate-270" : "rotate-0"]) }, null, 2), _cache[3] || (_cache[3] = createElementVNode("div", { class: "ws-nowrap text-amber" }, " Unauthorized ", -1))])])], 2)) : createCommentVNode("v-if", true),
+					createElementVNode("div", { class: normalizeClass([isMinimized.value ? "opacity-0 pointer-events-none" : "opacity-100", "transition duration-200 flex items-center w-full h-full justify-center px3"]) }, [createVNode(_sfc_main$8, {
+						context: unref(context),
+						groups: splitEntries.value.visible,
+						"is-vertical": unref(context).panel.isVertical,
+						selected: selectedEntry.value,
+						onSelect: _cache[1] || (_cache[1] = (e) => unref(context).docks.switchEntry(e?.id))
+					}, null, 8, [
+						"context",
+						"groups",
+						"is-vertical",
+						"selected"
+					]), splitEntries.value.overflow.length > 0 ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [_cache[4] || (_cache[4] = createElementVNode("div", { class: "border-base m1 h-20px w-px border-r-1.5" }, null, -1)), createVNode(_sfc_main$5, {
+						context: unref(context),
+						"is-vertical": unref(context).panel.isVertical,
+						groups: splitEntries.value.overflow,
+						selected: selectedEntry.value,
+						onSelect: _cache[2] || (_cache[2] = (e) => unref(context).docks.switchEntry(e?.id)),
+						onActivity: bringUp
+					}, null, 8, [
+						"context",
+						"is-vertical",
+						"groups",
+						"selected"
+					])], 64)) : createCommentVNode("v-if", true)], 2)
+				], 32)], 4)
+			], 38);
+		};
+	}
+});
+//#endregion
+//#region src/client/webcomponents/components/dock/DockPanelResizer.vue
+const PANEL_MIN = 20;
+const PANEL_MAX = 100;
+const _sfc_main$3 = /*@__PURE__*/ defineComponent({
+	__name: "DockPanelResizer",
+	props: {
+		panel: {},
+		edgeMode: {
+			type: Boolean,
+			default: false
+		}
+	},
+	setup(__props) {
+		const props = __props;
+		const topHandle = useTemplateRef("topHandle");
+		const container = computed(() => topHandle.value?.parentElement);
+		const resizingState = ref(false);
+		function handleResize(e) {
+			if (!resizingState.value) return;
+			const box = container.value?.getBoundingClientRect();
+			if (!box) return;
+			const store = props.panel.store;
+			let widthPx, heightPx;
+			if (resizingState.value.right) {
+				widthPx = Math.abs(e instanceof MouseEvent ? e.clientX : (e.touches[0]?.clientX || 0) - (box?.left || 0));
+				store.width = Math.min(PANEL_MAX, Math.max(PANEL_MIN, widthPx / window.innerWidth * 100));
+			} else if (resizingState.value.left) {
+				widthPx = Math.abs((box?.right || 0) - (e instanceof MouseEvent ? e.clientX : e.touches[0]?.clientX || 0));
+				store.width = Math.min(PANEL_MAX, Math.max(PANEL_MIN, widthPx / window.innerWidth * 100));
+			}
+			if (resizingState.value.top) {
+				heightPx = Math.abs((box?.bottom || 0) - (e instanceof MouseEvent ? e.clientY : e.touches[0]?.clientY || 0));
+				store.height = Math.min(PANEL_MAX, Math.max(PANEL_MIN, heightPx / window.innerHeight * 100));
+			} else if (resizingState.value.bottom) {
+				heightPx = Math.abs(e instanceof MouseEvent ? e.clientY : (e.touches[0]?.clientY || 0) - (box?.top || 0));
+				store.height = Math.min(PANEL_MAX, Math.max(PANEL_MIN, heightPx / window.innerHeight * 100));
+			}
+		}
+		useEventListener(window, "mousemove", handleResize);
+		useEventListener(window, "touchmove", handleResize);
+		useEventListener(window, "mouseup", () => resizingState.value = false);
+		useEventListener(window, "touchend", () => resizingState.value = false);
+		useEventListener(window, "mouseleave", () => resizingState.value = false);
+		watch(resizingState, (value) => {
+			props.panel.isResizing = !!value;
+		}, { flush: "sync" });
+		return (_ctx, _cache) => {
+			return openBlock(), createElementBlock(Fragment, null, [
+				createCommentVNode(" Handlers "),
+				withDirectives(createElementVNode("div", {
+					ref_key: "topHandle",
+					ref: topHandle,
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-horizontal",
+					style: { top: 0 },
+					onMousedown: _cache[0] || (_cache[0] = withModifiers(($event) => resizingState.value = { top: true }, ["prevent"])),
+					onTouchstartPassive: _cache[1] || (_cache[1] = () => resizingState.value = { top: true })
+				}, null, 544), [[vShow, __props.edgeMode ? __props.panel.store.position === "bottom" : __props.panel.store.position !== "top"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-horizontal",
+					style: { bottom: 0 },
+					onMousedown: _cache[2] || (_cache[2] = withModifiers(() => resizingState.value = { bottom: true }, ["prevent"])),
+					onTouchstartPassive: _cache[3] || (_cache[3] = () => resizingState.value = { bottom: true })
+				}, null, 544), [[vShow, __props.edgeMode ? __props.panel.store.position === "top" : __props.panel.store.position !== "bottom"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-vertical",
+					style: { left: 0 },
+					onMousedown: _cache[4] || (_cache[4] = withModifiers(() => resizingState.value = { left: true }, ["prevent"])),
+					onTouchstartPassive: _cache[5] || (_cache[5] = () => resizingState.value = { left: true })
+				}, null, 544), [[vShow, __props.edgeMode ? __props.panel.store.position === "right" : __props.panel.store.position !== "left"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-vertical",
+					style: { right: 0 },
+					onMousedown: _cache[6] || (_cache[6] = withModifiers(() => resizingState.value = { right: true }, ["prevent"])),
+					onTouchstartPassive: _cache[7] || (_cache[7] = () => resizingState.value = { right: true })
+				}, null, 544), [[vShow, __props.edgeMode ? __props.panel.store.position === "left" : __props.panel.store.position !== "right"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-corner",
+					style: {
+						top: 0,
+						left: 0,
+						cursor: "nwse-resize"
+					},
+					onMousedown: _cache[8] || (_cache[8] = withModifiers(() => resizingState.value = {
+						top: true,
+						left: true
+					}, ["prevent"])),
+					onTouchstartPassive: _cache[9] || (_cache[9] = () => resizingState.value = {
+						top: true,
+						left: true
+					})
+				}, null, 544), [[vShow, !__props.edgeMode && __props.panel.store.position !== "top" && __props.panel.store.position !== "left"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-corner",
+					style: {
+						top: 0,
+						right: 0,
+						cursor: "nesw-resize"
+					},
+					onMousedown: _cache[10] || (_cache[10] = withModifiers(() => resizingState.value = {
+						top: true,
+						right: true
+					}, ["prevent"])),
+					onTouchstartPassive: _cache[11] || (_cache[11] = () => resizingState.value = {
+						top: true,
+						right: true
+					})
+				}, null, 544), [[vShow, !__props.edgeMode && __props.panel.store.position !== "top" && __props.panel.store.position !== "right"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-corner",
+					style: {
+						bottom: 0,
+						left: 0,
+						cursor: "nesw-resize"
+					},
+					onMousedown: _cache[12] || (_cache[12] = withModifiers(() => resizingState.value = {
+						bottom: true,
+						left: true
+					}, ["prevent"])),
+					onTouchstartPassive: _cache[13] || (_cache[13] = () => resizingState.value = {
+						bottom: true,
+						left: true
+					})
+				}, null, 544), [[vShow, !__props.edgeMode && __props.panel.store.position !== "bottom" && __props.panel.store.position !== "left"]]),
+				withDirectives(createElementVNode("div", {
+					class: "vite-devtools-resize-handle vite-devtools-resize-handle-corner",
+					style: {
+						bottom: 0,
+						right: 0,
+						cursor: "nwse-resize"
+					},
+					onMousedown: _cache[14] || (_cache[14] = withModifiers(() => resizingState.value = {
+						bottom: true,
+						right: true
+					}, ["prevent"])),
+					onTouchstartPassive: _cache[15] || (_cache[15] = () => resizingState.value = {
+						bottom: true,
+						right: true
+					})
+				}, null, 544), [[vShow, !__props.edgeMode && __props.panel.store.position !== "bottom" && __props.panel.store.position !== "right"]])
+			], 64);
+		};
+	}
+});
+//#endregion
+//#region src/client/webcomponents/components/dock/DockEdge.vue
+const _hoisted_1$1 = { class: "relative flex-1 min-w-0 h-full" };
+const _sfc_main$2 = /*@__PURE__*/ defineComponent({
+	__name: "DockEdge",
+	props: { context: {} },
+	setup(__props) {
+		const context = __props.context;
+		const store = context.panel.store;
+		const viewsContainer = useTemplateRef("viewsContainer");
+		const panes = useIframePanes(viewsContainer, context.panel);
+		const isVertical = computed(() => store.position === "left" || store.position === "right");
+		const groupedEntries = computed(() => context.docks.groupedEntries);
+		const selectedEntry = computed(() => context.docks.selected);
+		const activeGroup = computed(() => getEntryGroup(context.docks.entries, selectedEntry.value));
+		const hasPanelContent = computed(() => {
+			const entry = selectedEntry.value;
+			return context.panel.store.open && !!entry && entry.type !== "action";
+		});
+		const positions = [
+			"top",
+			"right",
+			"bottom",
+			"left"
+		];
+		const positionIcons = {
+			top: "i-ph-square-half-bottom-duotone rotate-180",
+			right: "i-ph-square-half-bottom-duotone rotate-270",
+			bottom: "i-ph-square-half-bottom-duotone",
+			left: "i-ph-square-half-bottom-duotone rotate-90"
+		};
+		const positionLabels = {
+			top: "Top",
+			right: "Right",
+			bottom: "Bottom",
+			left: "Left"
+		};
+		const positionDropdownPlacement = {
+			top: "bottom",
+			bottom: "top",
+			left: "right",
+			right: "left"
+		};
+		function switchPosition(pos) {
+			store.position = pos;
+			setEdgePositionDropdown(null);
+		}
+		const positionButton = useTemplateRef("positionButton");
+		const floatButton = useTemplateRef("floatButton");
+		const edgePositionDropdown = useEdgePositionDropdown();
+		function showTooltip(el, text) {
+			if (!el) return;
+			setFloatingTooltip({
+				content: text,
+				el
+			});
+		}
+		function hideTooltip() {
+			setFloatingTooltip(null);
+		}
+		function togglePositionDropdown() {
+			if (!positionButton.value) return;
+			if (edgePositionDropdown.value) {
+				setEdgePositionDropdown(null);
+				return;
+			}
+			setEdgePositionDropdown({
+				el: positionButton.value,
+				gap: 6,
+				placement: positionDropdownPlacement[store.position],
+				content: () => h("div", { class: "flex flex-col gap-0.5 min-w-28" }, positions.map((pos) => h("button", {
+					class: ["flex items-center gap-2 w-full px2 py1 rounded hover:bg-active transition text-sm", store.position === pos ? "text-primary bg-active" : "op75 hover:op100"],
+					onClick: () => switchPosition(pos)
+				}, [h("div", { class: `${positionIcons[pos]} w-4.5 h-4.5` }), h("span", positionLabels[pos])])))
+			});
+		}
+		function switchToFloat() {
+			switch (store.position) {
+				case "bottom":
+					store.left = 50;
+					store.top = 100;
+					break;
+				case "top":
+					store.left = 50;
+					store.top = 0;
+					break;
+				case "left":
+					store.left = 0;
+					store.top = 50;
+					break;
+				case "right":
+					store.left = 100;
+					store.top = 50;
+					break;
+			}
+			store.mode = "float";
+		}
+		const panelStyle = computed(() => {
+			const style = {
+				position: "fixed",
+				pointerEvents: context.panel.isResizing ? "none" : "auto"
+			};
+			switch (store.position) {
+				case "bottom":
+					style.left = "0";
+					style.right = "0";
+					style.bottom = "0";
+					style.borderRadius = "8px 8px 0 0";
+					if (hasPanelContent.value) {
+						style.height = `${store.height}vh`;
+						style.minHeight = "150px";
+					}
+					break;
+				case "top":
+					style.left = "0";
+					style.right = "0";
+					style.top = "0";
+					style.borderRadius = "0 0 8px 8px";
+					if (hasPanelContent.value) {
+						style.height = `${store.height}vh`;
+						style.minHeight = "150px";
+					}
+					break;
+				case "left":
+					style.top = "0";
+					style.bottom = "0";
+					style.left = "0";
+					style.borderRadius = "0 8px 8px 0";
+					if (hasPanelContent.value) {
+						style.width = `${store.width}vw`;
+						style.minWidth = "200px";
+					}
+					break;
+				case "right":
+					style.top = "0";
+					style.bottom = "0";
+					style.right = "0";
+					style.borderRadius = "8px 0 0 8px";
+					if (hasPanelContent.value) {
+						style.width = `${store.width}vw`;
+						style.minWidth = "200px";
+					}
+					break;
+			}
+			return style;
+		});
+		const panelLayoutClass = computed(() => {
+			switch (store.position) {
+				case "bottom": return "flex flex-col-reverse";
+				case "top": return "flex flex-col";
+				case "left": return "flex flex-row";
+				case "right": return "flex flex-row-reverse";
+				default: return "flex flex-col-reverse";
+			}
+		});
+		const toolbarClass = computed(() => {
+			switch (store.position) {
+				case "bottom": return "flex-row w-full border-t border-base";
+				case "top": return "flex-row w-full border-b border-base";
+				case "left": return "flex-col h-full w-[40px] border-r border-base";
+				case "right": return "flex-col h-full w-[40px] border-l border-base";
+				default: return "flex-row w-full border-t border-base";
+			}
+		});
+		const contentClass = computed(() => {
+			return isVertical.value ? "flex-1 h-full overflow-hidden" : "flex-1 w-full overflow-hidden";
+		});
+		return (_ctx, _cache) => {
+			return openBlock(), createElementBlock("div", {
+				id: "vite-devtools-edge-panel",
+				class: normalizeClass(["bg-glass:80 border border-base color-base shadow overflow-hidden z-floating-anchor font-sans text-[15px] box-border", panelLayoutClass.value]),
+				style: normalizeStyle(panelStyle.value)
+			}, [
+				hasPanelContent.value ? (openBlock(), createBlock(_sfc_main$3, {
+					key: 0,
+					panel: unref(context).panel,
+					"edge-mode": ""
+				}, null, 8, ["panel"])) : createCommentVNode("v-if", true),
+				createCommentVNode(" Toolbar "),
+				createElementVNode("div", { class: normalizeClass(["flex items-center shrink-0 select-none py1", toolbarClass.value]) }, [
+					createElementVNode("div", { class: normalizeClass(["flex items-center flex-1 flex-wrap gap-0.5 px1", isVertical.value ? "flex-col py1" : "flex-row px1"]) }, [createVNode(_sfc_main$8, {
+						context: unref(context),
+						groups: groupedEntries.value,
+						"is-vertical": isVertical.value,
+						rotate: false,
+						selected: selectedEntry.value,
+						onSelect: _cache[0] || (_cache[0] = (e) => unref(context).docks.switchEntry(e?.id))
+					}, null, 8, [
+						"context",
+						"groups",
+						"is-vertical",
+						"selected"
+					])], 2),
+					createCommentVNode(" Position dropdown & float toggle "),
+					createElementVNode("div", { class: normalizeClass(["flex items-center gap-0.5 shrink-0 px1", isVertical.value ? "flex-col py1 border-t border-base" : "flex-row px1 border-l border-base"]) }, [createElementVNode("button", {
+						ref_key: "positionButton",
+						ref: positionButton,
+						"aria-label": "Edge position",
+						class: "p1.5 rounded hover:bg-active transition op75 hover:op100",
+						onPointerenter: _cache[1] || (_cache[1] = ($event) => showTooltip(positionButton.value, "Edge position")),
+						onPointerleave: hideTooltip,
+						onPointerdown: hideTooltip,
+						onClick: togglePositionDropdown
+					}, [createElementVNode("div", { class: normalizeClass([positionIcons[unref(store).position], "w-4.5 h-4.5"]) }, null, 2)], 544), createElementVNode("button", {
+						ref_key: "floatButton",
+						ref: floatButton,
+						"aria-label": "Float mode",
+						class: "p1.5 rounded hover:bg-active transition op50 hover:op100",
+						onPointerenter: _cache[2] || (_cache[2] = ($event) => showTooltip(floatButton.value, "Float mode")),
+						onPointerleave: hideTooltip,
+						onPointerdown: hideTooltip,
+						onClick: switchToFloat
+					}, [..._cache[3] || (_cache[3] = [createElementVNode("div", { class: "i-ph-cards-three-duotone w-4.5 h-4.5" }, null, -1)])], 544)], 2)
+				], 2),
+				createCommentVNode(" Content "),
+				withDirectives(createElementVNode("div", { class: normalizeClass(["flex", contentClass.value]) }, [activeGroup.value ? (openBlock(), createBlock(_sfc_main$10, {
+					key: 0,
+					context: unref(context),
+					group: activeGroup.value,
+					"selected-id": selectedEntry.value?.id ?? null
+				}, null, 8, [
+					"context",
+					"group",
+					"selected-id"
+				])) : createCommentVNode("v-if", true), createElementVNode("div", _hoisted_1$1, [renderSlot(_ctx.$slots, "view", { entry: selectedEntry.value }, () => [hasPanelContent.value && unref(panes) && selectedEntry.value ? (openBlock(), createBlock(_sfc_main$11, {
+					key: selectedEntry.value.id,
+					context: unref(context),
+					entry: selectedEntry.value,
+					panes: unref(panes)
+				}, null, 8, [
+					"context",
+					"entry",
+					"panes"
+				])) : createCommentVNode("v-if", true), createElementVNode("div", {
+					id: "vite-devtools-views-container",
+					ref_key: "viewsContainer",
+					ref: viewsContainer,
+					class: "absolute inset-0 pointer-events-none"
+				}, null, 512)])])], 2), [[vShow, hasPanelContent.value]])
+			], 6);
+		};
+	}
+});
+//#endregion
+//#region src/client/webcomponents/components/dock/DockPanel.vue
+const _hoisted_1 = { class: "flex w-full h-full" };
+const _hoisted_2 = { class: "relative flex-1 min-w-0 h-full" };
+const _sfc_main$1 = /*@__PURE__*/ defineComponent({
+	__name: "DockPanel",
+	props: {
+		context: {},
+		selected: {},
+		dockEl: {},
+		panelMargins: {},
+		layout: {}
+	},
+	setup(__props) {
+		const props = __props;
+		const context = props.context;
+		const { selected, panelMargins } = toRefs(props);
+		const layout = computed(() => props.layout ?? DEFAULT_DOCK_LAYOUT);
+		const activeGroup = computed(() => getEntryGroup(context.docks.entries, selected.value));
+		const windowSize = reactive(useWindowSize());
+		const isHovering = ref(false);
+		const mousePosition = reactive({
+			x: 0,
+			y: 0
+		});
+		const dockPanel = useTemplateRef("dockPanel");
+		const viewsContainer = useTemplateRef("viewsContainer");
+		const panes = useIframePanes(viewsContainer, context.panel, () => getEntryPaneKey(selected.value));
+		function openContextMenu(e) {
+			if (!dockPanel.value) return;
+			const entry = selected.value;
+			if (!entry) return;
+			e.preventDefault();
+			openDockContextMenu({
+				context,
+				entry,
+				el: dockPanel.value,
+				gap: 6
+			});
+		}
+		const anchorPos = computed(() => {
+			const store = context.panel.store;
+			return resolveDockAnchor({
+				edge: store.position,
+				leftPercent: store.left,
+				topPercent: store.top,
+				viewportWidth: windowSize.width,
+				viewportHeight: windowSize.height,
+				dockWidth: props.dockEl?.clientWidth || 0,
+				dockHeight: props.dockEl?.clientHeight || 0,
+				margins: panelMargins.value
+			});
+		});
+		let _timer = null;
+		function bringUp() {
+			isHovering.value = true;
+			if (context.panel.store.inactiveTimeout < 0) return;
+			if (_timer) clearTimeout(_timer);
+			_timer = setTimeout(() => {
+				isHovering.value = false;
+			}, +context.panel.store.inactiveTimeout || 0);
+		}
+		const { width: frameWidth, height: frameHeight } = useElementBounding(dockPanel);
+		const panelStyle = computed(() => {
+			mousePosition.x, mousePosition.y;
+			const dockThickness = props.dockEl?.clientHeight || 0;
+			const halfHeight = dockThickness * (1 - layout.value.panelOverlapFactor);
+			const frameMargin = {
+				left: panelMargins.value.left + halfHeight,
+				top: panelMargins.value.top + halfHeight,
+				right: panelMargins.value.right + halfHeight,
+				bottom: panelMargins.value.bottom + halfHeight
+			};
+			const panel = context.panel;
+			const store = panel.store;
+			const overlapOffset = dockThickness * (.5 - layout.value.panelOverlapFactor);
+			const isVerticalDock = store.position === "left" || store.position === "right";
+			const marginHorizontal = frameMargin.left + frameMargin.right + (isVerticalDock ? overlapOffset : 0);
+			const marginVertical = frameMargin.top + frameMargin.bottom + (isVerticalDock ? 0 : overlapOffset);
+			const maxWidth = windowSize.width - marginHorizontal;
+			const maxHeight = windowSize.height - marginVertical;
+			const style = {
+				position: "fixed",
+				pointerEvents: panel.isDragging || panel.isResizing ? "none" : "auto",
+				width: `min(${store.width}vw, calc(100vw - ${marginHorizontal}px))`,
+				height: `min(${store.height}vh, calc(100vh - ${marginVertical}px))`
+			};
+			const anchor = anchorPos.value;
+			const width = Math.min(maxWidth, store.width * windowSize.width / 100);
+			const height = Math.min(maxHeight, store.height * windowSize.height / 100);
+			const anchorX = anchor?.left || 0;
+			const anchorY = anchor?.top || 0;
+			switch (store.position) {
+				case "top":
+				case "bottom":
+					style.left = `${-frameWidth.value / 2}px`;
+					style.transform = "translate(0, 0)";
+					if (anchorX - frameMargin.left < width / 2) style.left = `${width / 2 - anchorX + frameMargin.left - frameWidth.value / 2}px`;
+					else if (windowSize.width - anchorX - frameMargin.right < width / 2) style.left = `${windowSize.width - anchorX - width / 2 - frameMargin.right - frameWidth.value / 2}px`;
+					break;
+				case "right":
+				case "left":
+					style.top = `${-frameHeight.value / 2}px`;
+					style.transform = "translate(0, 0)";
+					if (anchorY - frameMargin.top < height / 2) style.top = `${height / 2 - anchorY + frameMargin.top - frameHeight.value / 2}px`;
+					else if (windowSize.height - anchorY - frameMargin.bottom < height / 2) style.top = `${windowSize.height - anchorY - height / 2 - frameMargin.bottom - frameHeight.value / 2}px`;
+					break;
+			}
+			switch (store.position) {
+				case "top":
+					style.top = `${overlapOffset}px`;
+					break;
+				case "right":
+					style.right = `${overlapOffset}px`;
+					break;
+				case "left":
+					style.left = `${overlapOffset}px`;
+					break;
+				default:
+					style.bottom = `${overlapOffset}px`;
+					break;
+			}
+			return style;
+		});
+		onMounted(() => {
+			bringUp();
+		});
+		return (_ctx, _cache) => {
+			return withDirectives((openBlock(), createElementBlock("div", {
+				ref_key: "dockPanel",
+				ref: dockPanel,
+				class: "bg-glass:80 rounded-lg border border-base color-base shadow overflow-hidden",
+				style: normalizeStyle(panelStyle.value),
+				onContextmenu: openContextMenu
+			}, [createVNode(_sfc_main$3, { panel: unref(context).panel }, null, 8, ["panel"]), createElementVNode("div", _hoisted_1, [activeGroup.value ? (openBlock(), createBlock(_sfc_main$10, {
+				key: 0,
+				context: unref(context),
+				group: activeGroup.value,
+				"selected-id": unref(selected)?.id ?? null
+			}, null, 8, [
+				"context",
+				"group",
+				"selected-id"
+			])) : createCommentVNode("v-if", true), createElementVNode("div", _hoisted_2, [renderSlot(_ctx.$slots, "view", { entry: unref(selected) }, () => [unref(selected) && unref(panes) ? (openBlock(), createBlock(_sfc_main$11, {
+				key: unref(selected).id,
+				context: unref(context),
+				entry: unref(selected),
+				panes: unref(panes),
+				"iframe-style": {
+					border: "none",
+					borderRadius: "0.5rem"
+				}
+			}, null, 8, [
+				"context",
+				"entry",
+				"panes"
+			])) : createCommentVNode("v-if", true), createElementVNode("div", {
+				id: "vite-devtools-views-container",
+				ref_key: "viewsContainer",
+				ref: viewsContainer,
+				class: "absolute inset-0 pointer-events-none"
+			}, null, 512)])])])], 36)), [[vShow, unref(context).docks.selected && unref(context).docks.selected.type !== "action"]]);
+		};
+	}
+});
+//#endregion
+//#region src/client/webcomponents/components/DockEmbedded.ts
+const DockEmbedded = defineCustomElement(/* @__PURE__ */ defineComponent({
+	__name: "DockEmbedded",
+	props: {
+		context: {},
+		layout: {}
+	},
+	setup(__props) {
+		const props = __props;
+		const isDockPopupOpen = useIsDockPopupOpen();
+		const settings = sharedStateToRef(props.context.docks.settings);
+		const isRpcTrusted = useIsRpcTrusted(props.context);
+		useEventListener(window, "mousedown", (e) => {
+			if (!settings.value.closeOnOutsideClick) return;
+			if (isDockPopupOpen.value) return;
+			if (!props.context.panel.store.open || props.context.panel.isDragging || props.context.panel.isResizing) return;
+			if (!e.composedPath().find((_el) => {
+				const el = _el;
+				return [...el.classList || []].some((c) => c.startsWith("vite-devtools-")) || el.id?.startsWith("vite-devtools-") || el.tagName?.toLowerCase() === "iframe";
+			})) props.context.docks.switchEntry(null);
+		});
+		onUnmounted(() => {
+			closeDockPopup();
+		});
+		return (_ctx, _cache) => {
+			return openBlock(), createBlock(_sfc_main$12, null, {
+				default: withCtx(() => [
+					!unref(isDockPopupOpen) ? (openBlock(), createElementBlock(Fragment, { key: 0 }, [unref(isRpcTrusted) && __props.context.panel.store.mode === "edge" ? (openBlock(), createBlock(_sfc_main$2, {
+						key: 0,
+						context: __props.context
+					}, null, 8, ["context"])) : (openBlock(), createBlock(_sfc_main$4, {
+						key: 1,
+						context: __props.context,
+						layout: props.layout
+					}, {
+						default: withCtx(({ dockEl, panelMargins, selected, layout }) => [createVNode(_sfc_main$1, {
+							context: __props.context,
+							selected,
+							"dock-el": dockEl,
+							"panel-margins": panelMargins,
+							layout
+						}, null, 8, [
+							"context",
+							"selected",
+							"dock-el",
+							"panel-margins",
+							"layout"
+						])]),
+						_: 1
+					}, 8, ["context", "layout"])), createVNode(_sfc_main$13)], 64)) : createCommentVNode("v-if", true),
+					!unref(isDockPopupOpen) ? (openBlock(), createBlock(_sfc_main$14, {
+						key: 1,
+						context: __props.context
+					}, null, 8, ["context"])) : createCommentVNode("v-if", true),
+					createVNode(_sfc_main$15, { context: __props.context }, null, 8, ["context"]),
+					!unref(isDockPopupOpen) ? (openBlock(), createBlock(_sfc_main$16, { key: 2 })) : createCommentVNode("v-if", true)
+				]),
+				_: 1
+			});
+		};
+	}
+}), {
+	shadowRoot: true,
+	styles: [css_default]
+});
+customElements.define("vite-devtools-dock-embedded", DockEmbedded);
+//#endregion
+export { DEFAULT_DOCK_PANEL_STORE, DockEmbedded, DockStandalone, createDockEntryState, sharedStateToRef, useDocksEntries };

@@ -1,0 +1,39 @@
+{
+  "name": "@nodable/compact-builder",
+  "version": "2.0.0",
+  "description": "Compact JS Object builder for flexible-xml-parser",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "flexible-xml-parser",
+    "nodable",
+    "xml",
+    "json"
+  ],
+  "author": "Amit Gupta (https://solothought.com)",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@nodable/base-output-builder": "^2.0.0",
+    "path-expression-matcher": "^1.6.1"
+  },
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/nodable"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nodable/flexible-output-builders.git"
+  }
+}

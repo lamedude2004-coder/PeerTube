@@ -1,0 +1,16 @@
+export interface Tokens {
+    /** Function name, lowercased (e.g. "rgb", "oklch", "color-mix"). */
+    name: string;
+    /**
+     * Top-level argument tokens, split on whitespace at paren depth 0. Nested
+     * function calls (origins, `calc(...)`) stay whole. The separators `/` (alpha)
+     * and `,` (color-mix groups) are emitted as their own "/" and "," tokens.
+     */
+    tokens: string[];
+}
+/**
+ * Tokenize a CSS color function string, e.g. "oklch(from green l c h / .5)".
+ * @returns the function name and its top-level tokens, or null if the input is
+ *   not a function call (no parentheses).
+ */
+export declare function tokenize(input: string): Tokens | null;

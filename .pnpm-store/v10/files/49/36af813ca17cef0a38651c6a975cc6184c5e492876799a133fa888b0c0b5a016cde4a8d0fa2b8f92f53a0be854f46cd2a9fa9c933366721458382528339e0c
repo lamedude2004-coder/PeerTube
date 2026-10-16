@@ -1,0 +1,38 @@
+import "./types-_vo7QhmS.mjs";
+import { DevframeDefinition } from "devframe/types";
+//#region src/index.d.ts
+interface InspectDevframeOptions {
+  /** Override the devframe id (and default CLI command / mount path). */
+  id?: string;
+  /** Override the display name shown in a host dock. */
+  name?: string;
+  /** Override the dock icon. */
+  icon?: string;
+  /**
+   * Override the mount path. Left unset, the SPA mounts at `/` standalone
+   * and `/__<id>/` when hosted (Vite/embedded).
+   */
+  basePath?: string;
+  /** Preferred standalone CLI port. */
+  port?: number;
+  /**
+   * Require the trust handshake on the standalone server. Enabled by
+   * default — `--open` embeds the current OTP in the opened URL, so the
+   * tab authenticates automatically without extra prompts. Hosted adapters
+   * manage their own auth and ignore this.
+   */
+  auth?: boolean;
+}
+/**
+ * Build a {@link DevframeDefinition} for the Devframe Inspector. The
+ * same definition runs standalone (`/cli`, `/spa`, `/build`) and mounts
+ * into a host (`/vite`, hub).
+ *
+ * @experimental This plugin is experimental and may change without a major
+ * version bump until it stabilizes.
+ */
+declare function createInspectDevframe(options?: InspectDevframeOptions): DevframeDefinition;
+/** The default inspector devframe definition. */
+declare const inspectDevframe: DevframeDefinition;
+//#endregion
+export { createInspectDevframe as n, inspectDevframe as r, InspectDevframeOptions as t };

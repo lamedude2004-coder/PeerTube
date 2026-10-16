@@ -1,0 +1,4 @@
+import { t as startDevTools } from "../runtime-DxwmjAOb.js";
+//#region src/client/inject/index.ts
+startDevTools("normal");
+//#endregion

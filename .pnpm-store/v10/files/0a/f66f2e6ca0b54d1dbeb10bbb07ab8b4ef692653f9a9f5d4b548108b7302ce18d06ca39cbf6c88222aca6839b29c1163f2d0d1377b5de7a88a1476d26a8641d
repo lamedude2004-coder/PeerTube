@@ -1,0 +1,12 @@
+import { ColorBits } from '../core/bits';
+/**
+ * Map of CSS named color -> ColorBits (opaque), plus `transparent`.
+ * Keys are lowercase. Uses a null prototype so lookups of names like
+ * `toString` correctly miss.
+ */
+export declare const namedColors: Record<string, ColorBits>;
+/**
+ * Resolve a CSS named color (case-insensitive), or `transparent`.
+ * @returns the ColorBits, or null if the name is not a known color.
+ */
+export declare function resolveNamed(name: string): ColorBits | null;

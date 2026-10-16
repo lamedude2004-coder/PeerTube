@@ -1,0 +1,2 @@
+import { S3StorageOptions } from './s3-storage';
+export declare const fromEnv: (prefix?: string) => Partial<S3StorageOptions>;

@@ -1,0 +1,43 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.computePurgeInterval = computePurgeInterval;
+exports.normalizeExpiration = normalizeExpiration;
+const utils_1 = require("../utils");
+/**
+ * Computes a reasonable `purgeInterval` from `maxAge`.
+ *
+ * Formula: `clamp(maxAge / 12, 5min, 1h)`
+ *
+ * @example
+ * ```ts
+ * computePurgeInterval('1h')  // 300000 (5min)
+ * computePurgeInterval('6h')  // 1800000 (30min)
+ * computePurgeInterval('1d')  // 3600000 (1h)
+ * computePurgeInterval('7d')  // 3600000 (1h)
+ * ```
+ */
+function computePurgeInterval(maxAge) {
+    const maxAgeMs = (0, utils_1.toMilliseconds)(maxAge);
+    if (!maxAgeMs)
+        return undefined;
+    const MIN_PURGE_MS = 5 * 60 * 1000;
+    const MAX_PURGE_MS = 60 * 60 * 1000;
+    return (0, utils_1.clamp)(maxAgeMs / 12, MIN_PURGE_MS, MAX_PURGE_MS);
+}
+/**
+ * Normalizes `ExpirationInput` to `ExpirationOptions`.
+ *
+ * - `string | number` → `{ maxAge, purgeInterval: auto }`
+ * - `ExpirationOptions` → returned as-is
+ * - `null | undefined` → `undefined`
+ */
+function normalizeExpiration(expiration) {
+    if (!expiration)
+        return undefined;
+    if (typeof expiration === 'string' || typeof expiration === 'number') {
+        return { maxAge: expiration, purgeInterval: computePurgeInterval(expiration), rolling: true };
+    }
+    // Validate object maxAge early (throws on invalid).
+    (0, utils_1.toMilliseconds)(expiration.maxAge);
+    return { ...expiration };
+}

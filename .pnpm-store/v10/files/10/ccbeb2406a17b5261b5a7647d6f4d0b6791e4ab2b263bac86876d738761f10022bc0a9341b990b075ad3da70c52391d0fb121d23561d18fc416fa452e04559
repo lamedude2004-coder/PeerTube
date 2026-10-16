@@ -1,0 +1,15 @@
+import { TerminalPreset, TerminalSessionInfo } from "../types.mjs";
+import { TERMINAL_STREAM_CHANNEL } from "../constants.mjs";
+import { DevframeRpcClient } from "devframe/client";
+//#region src/client/index.d.ts
+interface MountTerminalsOptions {
+  rpc?: DevframeRpcClient;
+  autostart?: boolean;
+}
+interface TerminalsHandle {
+  rpc: DevframeRpcClient;
+  dispose: () => void;
+}
+declare function mountTerminals(container: HTMLElement, options?: MountTerminalsOptions): Promise<TerminalsHandle>;
+//#endregion
+export { MountTerminalsOptions, TERMINAL_STREAM_CHANNEL, type TerminalPreset, type TerminalSessionInfo, TerminalsHandle, mountTerminals };

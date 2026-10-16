@@ -1,0 +1,140 @@
+import { i as InvokeResult, n as DevframeInspectCommandInfo, o as RpcFunctionInfo, r as DevframeInspectInstanceInfo } from "../types-_vo7QhmS.mjs";
+import "../index-B7KBbd3U.mjs";
+import { RpcDefinitionsToFunctions } from "devframe/rpc";
+//#region src/rpc/index.d.ts
+/**
+ * The introspection RPC functions registered by the inspector plugin.
+ * Namespaced `devframes:plugin:inspect:*` per the plugin convention.
+ */
+declare const serverFunctions: readonly [{
+  name: "devframes:plugin:inspect:list-functions";
+  type?: "query" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<RpcFunctionInfo[]>>>) | undefined;
+  handler?: (() => Promise<RpcFunctionInfo[]>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[], Promise<RpcFunctionInfo[]>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<RpcFunctionInfo[]>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<RpcFunctionInfo[]>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:invoke";
+  type?: "action" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[name: string, args?: unknown[] | undefined], Promise<InvokeResult>>>) | undefined;
+  handler?: ((name: string, args?: unknown[] | undefined) => Promise<InvokeResult>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[name: string, args?: unknown[] | undefined], Promise<InvokeResult>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[name: string, args?: unknown[] | undefined], Promise<InvokeResult>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[name: string, args?: unknown[] | undefined], Promise<InvokeResult>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:list-state-keys";
+  type?: "query" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<string[]>>>) | undefined;
+  handler?: (() => Promise<string[]>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[], Promise<string[]>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<string[]>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<string[]>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:describe-agent";
+  type?: "query" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<import("devframe").AgentManifest>>>) | undefined;
+  handler?: (() => Promise<import("devframe").AgentManifest>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[], Promise<import("devframe").AgentManifest>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<import("devframe").AgentManifest>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<import("devframe").AgentManifest>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:invoke-agent-tool";
+  type?: "action" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string, args: unknown], Promise<InvokeResult>>>) | undefined;
+  handler?: ((id: string, args: unknown) => Promise<InvokeResult>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[id: string, args: unknown], Promise<InvokeResult>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string, args: unknown], Promise<InvokeResult>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string, args: unknown], Promise<InvokeResult>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:read-agent-resource";
+  type?: "action" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string], Promise<InvokeResult>>>) | undefined;
+  handler?: ((id: string) => Promise<InvokeResult>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[id: string], Promise<InvokeResult>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string], Promise<InvokeResult>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string], Promise<InvokeResult>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:list-commands";
+  type?: "query" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<DevframeInspectCommandInfo[]>>>) | undefined;
+  handler?: (() => Promise<DevframeInspectCommandInfo[]>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[], Promise<DevframeInspectCommandInfo[]>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<DevframeInspectCommandInfo[]>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<DevframeInspectCommandInfo[]>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:execute-command";
+  type?: "action" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string, args?: unknown[] | undefined], Promise<InvokeResult>>>) | undefined;
+  handler?: ((id: string, args?: unknown[] | undefined) => Promise<InvokeResult>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[id: string, args?: unknown[] | undefined], Promise<InvokeResult>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string, args?: unknown[] | undefined], Promise<InvokeResult>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[id: string, args?: unknown[] | undefined], Promise<InvokeResult>>> | undefined;
+}, {
+  name: "devframes:plugin:inspect:list-instances";
+  type?: "query" | undefined;
+  cacheable?: boolean;
+  args?: undefined;
+  returns?: undefined;
+  jsonSerializable?: boolean;
+  agent?: import("devframe").RpcFunctionAgentOptions;
+  setup?: ((context: import("devframe").DevframeNodeContext) => import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<DevframeInspectInstanceInfo[]>>>) | undefined;
+  handler?: (() => Promise<DevframeInspectInstanceInfo[]>) | undefined;
+  dump?: import("devframe/rpc").RpcDump<[], Promise<DevframeInspectInstanceInfo[]>, import("devframe").DevframeNodeContext> | undefined;
+  snapshot?: boolean;
+  __cache?: WeakMap<object, import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<DevframeInspectInstanceInfo[]>>>> | undefined;
+  __promise?: import("devframe/rpc").Thenable<import("devframe/rpc").RpcFunctionSetupResult<[], Promise<DevframeInspectInstanceInfo[]>>> | undefined;
+}];
+declare module 'devframe' {
+  interface DevframeRpcServerFunctions extends RpcDefinitionsToFunctions<typeof serverFunctions> {}
+}
+//#endregion
+export { serverFunctions };

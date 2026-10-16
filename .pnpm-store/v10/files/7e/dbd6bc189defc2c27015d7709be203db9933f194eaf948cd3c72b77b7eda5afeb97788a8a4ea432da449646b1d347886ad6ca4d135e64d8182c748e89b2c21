@@ -1,0 +1,17 @@
+import { TerminalsOptions } from "./types.mjs";
+import { DevframeVitePlugin, ViteDevBridgeOptions } from "devframe/helpers/vite";
+//#region src/vite.d.ts
+interface TerminalsViteOptions extends TerminalsOptions {
+  /** Forwarded to the underlying `viteDevBridge` (mount base, etc.). */
+  vite?: ViteDevBridgeOptions;
+}
+/**
+ * Mount the terminals panel into an existing Vite dev server. Returns two
+ * plugins: a bridge that starts the devframe RPC + WebSocket server (so the
+ * panel can stream terminal output), and a static mount that serves the
+ * bundled SPA at the mount base. The bridge is listed first so its
+ * `__connection.json` route is matched ahead of the SPA fallback.
+ */
+declare function terminalsVite(options?: TerminalsViteOptions): DevframeVitePlugin[];
+//#endregion
+export { TerminalsViteOptions, terminalsVite };

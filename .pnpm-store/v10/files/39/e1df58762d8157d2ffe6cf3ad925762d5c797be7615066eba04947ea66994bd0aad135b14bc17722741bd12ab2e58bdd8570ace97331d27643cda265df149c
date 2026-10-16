@@ -1,0 +1,184 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parse = parse;
+exports.parseHex = parseHex;
+exports.parseColor = parseColor;
+const bits_1 = require("../core/bits");
+const channels_1 = require("../conversion/channels");
+const values_1 = require("./values");
+const HASH = 35; // '#'
+/**
+ * Approximative CSS colorspace string pattern, e.g. rgb(), color()
+ */
+const PATTERN = (() => {
+    const NAME = '(\\w+)';
+    const SEPARATOR = '[\\s,\\/]';
+    const VALUE = '([^\\s,\\/]+)';
+    const SEPARATOR_THEN_VALUE = `(?:${SEPARATOR}+${VALUE})`;
+    return new RegExp(`${NAME}\\(
+      ${SEPARATOR}*
+      ${VALUE}
+      ${SEPARATOR_THEN_VALUE}
+      ${SEPARATOR_THEN_VALUE}
+      ${SEPARATOR_THEN_VALUE}?
+      ${SEPARATOR_THEN_VALUE}?
+      ${SEPARATOR}*
+    \\)`.replace(/\s/g, ''));
+})();
+/**
+ * Parse CSS color. Fast path: supports hexadecimal and the absolute forms of
+ * every CSS color function. For named colors, relative colors (`from …`) and
+ * `color-mix()`, use `parseCSS` from `color-bits/css`.
+ * @param color CSS color string: #xxx, #xxxxxx, #xxxxxxxx, rgb(), rgba(), hsl(), hsla(), color()
+ */
+function parse(color) {
+    if (color.charCodeAt(0) === HASH) {
+        return parseHex(color);
+    }
+    else {
+        return parseColor(color);
+    }
+}
+/**
+ * Parse hexadecimal CSS color
+ * @param color Hex color string: #xxx, #xxxxxx, #xxxxxxxx
+ */
+function parseHex(color) {
+    let r = 0x00;
+    let g = 0x00;
+    let b = 0x00;
+    let a = 0xff;
+    switch (color.length) {
+        // #59f
+        case 4: {
+            r = (hexValue(color.charCodeAt(1)) << 4) + hexValue(color.charCodeAt(1));
+            g = (hexValue(color.charCodeAt(2)) << 4) + hexValue(color.charCodeAt(2));
+            b = (hexValue(color.charCodeAt(3)) << 4) + hexValue(color.charCodeAt(3));
+            break;
+        }
+        // #5599ff
+        case 7: {
+            r = (hexValue(color.charCodeAt(1)) << 4) + hexValue(color.charCodeAt(2));
+            g = (hexValue(color.charCodeAt(3)) << 4) + hexValue(color.charCodeAt(4));
+            b = (hexValue(color.charCodeAt(5)) << 4) + hexValue(color.charCodeAt(6));
+            break;
+        }
+        // #5599ff88
+        case 9: {
+            r = (hexValue(color.charCodeAt(1)) << 4) + hexValue(color.charCodeAt(2));
+            g = (hexValue(color.charCodeAt(3)) << 4) + hexValue(color.charCodeAt(4));
+            b = (hexValue(color.charCodeAt(5)) << 4) + hexValue(color.charCodeAt(6));
+            a = (hexValue(color.charCodeAt(7)) << 4) + hexValue(color.charCodeAt(8));
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    return (0, bits_1.newColor)(r, g, b, a);
+}
+// https://lemire.me/blog/2019/04/17/parsing-short-hexadecimal-strings-efficiently/
+function hexValue(c) {
+    return (c & 0xF) + 9 * (c >> 6);
+}
+/**
+ * Parse CSS color
+ * https://developer.mozilla.org/en-US/docs/Web/CSS/color_value
+ * @param color CSS color string: rgb(), rgba(), hsl(), hsla(), color()
+ */
+function parseColor(color) {
+    const match = PATTERN.exec(color);
+    if (match !== null) {
+        const format = match[1];
+        const p1 = match[2];
+        const p2 = match[3];
+        const p3 = match[4];
+        const p4 = match[5];
+        const p5 = match[6];
+        // Relative colors (`rgb(from …)`) are not handled by the fast path.
+        if ((0, values_1.isFromKeyword)(p1)) {
+            throw new Error(`Color.parse(): relative colors require parseCSS() from "color-bits/css": "${color}"`);
+        }
+        let result = parseColorFormat(format, p1, p2, p3, p4, p5);
+        if (result === null && format.toLowerCase() !== format) {
+            // CSS function names are ASCII case-insensitive; retry lowercased so the
+            // common all-lowercase inputs pay nothing.
+            result = parseColorFormat(format.toLowerCase(), p1, p2, p3, p4, p5);
+        }
+        if (result !== null) {
+            return result;
+        }
+    }
+    throw new Error(`Color.parse(): invalid CSS color: "${color}"`);
+}
+function parseColorFormat(format, p1, p2, p3, p4, p5) {
+    switch (format) {
+        case 'rgb':
+        case 'rgba': {
+            const r = (0, values_1.parseColorChannel)(p1);
+            const g = (0, values_1.parseColorChannel)(p2);
+            const b = (0, values_1.parseColorChannel)(p3);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, bits_1.newColor)(r, g, b, a);
+        }
+        case 'hsl':
+        case 'hsla': {
+            const h = (0, values_1.parseAngle)(p1);
+            const s = (0, values_1.parsePercent)(p2);
+            const l = (0, values_1.parsePercent)(p3);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, channels_1.hslToColor)(h, s, l, a);
+        }
+        case 'hwb': {
+            const h = (0, values_1.parseAngle)(p1);
+            const w = (0, values_1.parsePercent)(p2);
+            const b = (0, values_1.parsePercent)(p3);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, channels_1.hwbToColor)(h, w, b, a);
+        }
+        case 'lab': {
+            const l = (0, values_1.parseNumberOrPercentage)(p1, 100);
+            const aa = (0, values_1.parseNumberOrPercentage)(p2, 125);
+            const b = (0, values_1.parseNumberOrPercentage)(p3, 125);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, channels_1.labToColor)(l, aa, b, a);
+        }
+        case 'lch': {
+            const l = (0, values_1.parseNumberOrPercentage)(p1, 100);
+            const c = (0, values_1.parseNumberOrPercentage)(p2, 150);
+            const h = (0, values_1.parseAngle)(p3);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, channels_1.lchToColor)(l, c, h, a);
+        }
+        case 'oklab': {
+            const l = (0, values_1.parseNumberOrPercentage)(p1, 1);
+            const aa = (0, values_1.parseNumberOrPercentage)(p2, 0.4);
+            const b = (0, values_1.parseNumberOrPercentage)(p3, 0.4);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, channels_1.oklabToColor)(l, aa, b, a);
+        }
+        case 'oklch': {
+            const l = (0, values_1.parseNumberOrPercentage)(p1, 1);
+            const c = (0, values_1.parseNumberOrPercentage)(p2, 0.4);
+            const h = (0, values_1.parseAngle)(p3);
+            const a = p4 ? (0, values_1.parseAlphaChannel)(p4) : 255;
+            return (0, channels_1.oklchToColor)(l, c, h, a);
+        }
+        case 'color': {
+            // https://drafts.csswg.org/css-color-4/#color-function
+            const c1 = (0, values_1.parsePercentageOrValue)(p2);
+            const c2 = (0, values_1.parsePercentageOrValue)(p3);
+            const c3 = (0, values_1.parsePercentageOrValue)(p4);
+            const a = p5 ? (0, values_1.parseAlphaChannel)(p5) : 255;
+            // Color space names are ASCII case-insensitive too; retry on miss only.
+            let result = (0, channels_1.colorSpaceToColor)(p1, c1, c2, c3, a);
+            if (result === null && p1.toLowerCase() !== p1) {
+                result = (0, channels_1.colorSpaceToColor)(p1.toLowerCase(), c1, c2, c3, a);
+            }
+            return result;
+        }
+        default:
+            return null;
+    }
+}
+//# sourceMappingURL=fast.js.map

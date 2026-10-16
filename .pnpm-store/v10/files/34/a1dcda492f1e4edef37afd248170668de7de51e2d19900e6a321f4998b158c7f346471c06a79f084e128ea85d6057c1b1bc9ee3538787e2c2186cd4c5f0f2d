@@ -1,0 +1,264 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.S3Storage = exports.S3File = void 0;
+const client_s3_1 = require("@aws-sdk/client-s3");
+const credential_providers_1 = require("@aws-sdk/credential-providers");
+const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
+const core_1 = require("@uploadx/core");
+const bytes_1 = __importDefault(require("bytes"));
+const stream_1 = require("stream");
+const s3_meta_storage_1 = require("./s3-meta-storage");
+const BUCKET_NAME = 'node-uploadx';
+const MIN_PART_SIZE = 5 * 1024 * 1024;
+const PART_SIZE = 16 * 1024 * 1024;
+const PART_TIMEOUT = 300_000;
+class S3File extends core_1.File {
+    Parts;
+    UploadId;
+    uri;
+    partsUrls;
+    partSize;
+}
+exports.S3File = S3File;
+/**
+ * S3 storage based backend.
+ * @example
+ * ```ts
+ * const storage = new S3Storage({
+ *  bucket: <YOUR_BUCKET>,
+ *  endpoint: <YOUR_ENDPOINT>,
+ *  region: <YOUR_REGION>,
+ *  credentials: {
+ *    accessKeyId: <YOUR_ACCESS_KEY_ID>,
+ *    secretAccessKey: <YOUR_SECRET_ACCESS_KEY>
+ *  },
+ *  metaStorageOptions: { directory: '/tmp/upload-metafiles' }
+ * });
+ * ```
+ */
+class S3Storage extends core_1.BaseStorage {
+    options;
+    bucket;
+    client;
+    meta;
+    checksumTypes = ['md5'];
+    _partSize = PART_SIZE;
+    constructor(options = {}) {
+        super(options);
+        this.options = options;
+        this.bucket = options.bucket || BUCKET_NAME;
+        if (options.keyFile) {
+            options.credentials = (0, credential_providers_1.fromIni)({ configFilepath: options.keyFile });
+        }
+        this._partSize = bytes_1.default.parse(this.options.partSize || PART_SIZE);
+        if (this._partSize < MIN_PART_SIZE) {
+            throw new Error('Minimum allowed partSize value is 5MB');
+        }
+        if (this.options.clientDirectUpload) {
+            this.onCreate = async (file) => ({ statusCode: 200, body: file }); // TODO: remove hook
+        }
+        const clientConfig = { ...options };
+        this.client = new client_s3_1.S3Client(clientConfig);
+        this.meta = (0, core_1.createMetaStorage)(options, s3_meta_storage_1.S3MetaStorage);
+        this.isReady = false;
+        this.accessCheck()
+            .then(() => (this.isReady = true))
+            .catch(err => this.logger.error('Storage access check failed: {err.message}', { err }));
+    }
+    normalizeError(error) {
+        if (error.$metadata) {
+            return {
+                message: error.message,
+                code: error.Code || error.name,
+                statusCode: error.$metadata.httpStatusCode || 500,
+                name: error.name
+            };
+        }
+        return super.normalizeError(error);
+    }
+    async create(req, config) {
+        const file = new S3File(config);
+        file.name = this.namingFunction(file, req);
+        await this.validate(file);
+        try {
+            const existing = await this.getMeta(file.id);
+            if (existing.bytesWritten >= 0) {
+                return existing;
+            }
+        }
+        catch { }
+        const params = {
+            Bucket: this.bucket,
+            Key: file.name,
+            ContentType: file.contentType,
+            Metadata: (0, core_1.mapValues)(file.metadata, encodeURI),
+            ACL: this.options.acl
+        };
+        const { UploadId } = await this.client.send(new client_s3_1.CreateMultipartUploadCommand(params));
+        if (!UploadId) {
+            return (0, core_1.fail)(core_1.ERRORS.FILE_ERROR, 's3 create multipart upload error');
+        }
+        file.UploadId = UploadId;
+        file.bytesWritten = 0;
+        if (this.options.clientDirectUpload) {
+            file.partSize ??= this._partSize;
+        }
+        await this.saveMeta(file);
+        file.status = 'created';
+        if (this.options.clientDirectUpload)
+            return this.buildPresigned(file);
+        return file;
+    }
+    async write(part) {
+        const file = await this.getMeta(part.id);
+        await this.checkIfExpired(file);
+        if (file.status === 'completed')
+            return file;
+        if (part.size)
+            (0, core_1.updateSize)(file, part.size);
+        if (!(0, core_1.partMatch)(part, file))
+            return (0, core_1.fail)(core_1.ERRORS.FILE_CONFLICT);
+        if (this.options.clientDirectUpload)
+            return this.buildPresigned(file);
+        file.Parts ??= await this._getParts(file);
+        file.bytesWritten = file.Parts.map(item => item.Size || 0).reduce((p, c) => p + c, 0);
+        if ((0, core_1.hasContent)(part)) {
+            if (this.isUnsupportedChecksum(part.checksumAlgorithm)) {
+                return (0, core_1.fail)(core_1.ERRORS.UNSUPPORTED_CHECKSUM_ALGORITHM);
+            }
+            const partNumber = file.Parts.length + 1;
+            const upstream = part.body;
+            const body = upstream.pipe(new stream_1.PassThrough());
+            const controller = new AbortController();
+            const abortSignal = controller.signal;
+            const onUpstreamGone = () => {
+                controller.abort();
+                body.destroy();
+            };
+            upstream.once('error', onUpstreamGone);
+            upstream.once('abort', onUpstreamGone);
+            const timeoutId = setTimeout(() => {
+                this.logger.warn(`Upload part timeout: ${file.name}, part ${partNumber}`);
+                onUpstreamGone();
+            }, PART_TIMEOUT);
+            const params = {
+                Bucket: this.bucket,
+                Key: file.name,
+                UploadId: file.UploadId,
+                PartNumber: partNumber,
+                Body: body,
+                ContentLength: part.contentLength || 0
+            };
+            if (part.checksumAlgorithm === 'md5') {
+                params.ContentMD5 = part.checksum;
+            }
+            try {
+                const { ETag } = await this.client.send(new client_s3_1.UploadPartCommand(params), { abortSignal });
+                const uploadPart = { PartNumber: partNumber, Size: part.contentLength, ETag };
+                file.Parts = [...file.Parts, uploadPart];
+                file.bytesWritten += part.contentLength || 0;
+            }
+            finally {
+                clearTimeout(timeoutId);
+                upstream.removeListener('error', onUpstreamGone);
+                upstream.removeListener('abort', onUpstreamGone);
+                body.destroy();
+            }
+        }
+        this.cache.set(file.id, file);
+        file.status = (0, core_1.getFileStatus)(file);
+        if (file.status === 'completed') {
+            const [completed] = await this._onComplete(file);
+            delete file.Parts;
+            file.uri = completed.Location;
+        }
+        return file;
+    }
+    async delete({ id }) {
+        const file = await this.getMeta(id).catch(() => null);
+        if (file) {
+            file.status = 'deleted';
+            await Promise.all([this.deleteMeta(file.id), this._abortMultipartUpload(file)]);
+            return [{ ...file }];
+        }
+        return [{ id }];
+    }
+    async update({ id }, metadata) {
+        if (this.options.clientDirectUpload) {
+            const file = await this.getMeta(id);
+            return this.buildPresigned({ ...file, ...metadata });
+        }
+        return super.update({ id }, metadata);
+    }
+    accessCheck(maxWaitTime = 30) {
+        return (0, client_s3_1.waitUntilBucketExists)({ client: this.client, maxWaitTime }, { Bucket: this.bucket });
+    }
+    async buildPresigned(file) {
+        if (!file.Parts?.length) {
+            file.Parts = await this._getParts(file);
+        }
+        file.bytesWritten = Math.min(file.Parts.length * this._partSize, file.size);
+        file.status = (0, core_1.getFileStatus)(file);
+        if (file.status === 'completed') {
+            const [completed] = await this._onComplete(file);
+            delete file.Parts;
+            delete file.partsUrls;
+            file.uri = completed.Location;
+            return file;
+        }
+        if (!file.partsUrls?.length) {
+            file.partsUrls = await this.getPartsPresignedUrls(file);
+        }
+        return file;
+    }
+    async getPartsPresignedUrls(file) {
+        file.partSize ??= this._partSize;
+        const partsNum = Math.ceil(file.size / this._partSize);
+        const promises = [];
+        const expiresIn = (0, core_1.toSeconds)(this.config.expiration?.maxAge || '6hrs');
+        for (let i = 0; i < partsNum; i++) {
+            const partCommandInput = {
+                Bucket: this.bucket,
+                Key: file.name,
+                UploadId: file.UploadId,
+                PartNumber: i + 1
+            };
+            promises.push((0, s3_request_presigner_1.getSignedUrl)(this.client, new client_s3_1.UploadPartCommand(partCommandInput), { expiresIn }));
+        }
+        return Promise.all(promises);
+    }
+    _onComplete = (file) => {
+        return Promise.all([this._completeMultipartUpload(file), this.deleteMeta(file.id)]);
+    };
+    async _getParts(file) {
+        const params = { Bucket: this.bucket, Key: file.name, UploadId: file.UploadId };
+        const { Parts = [] } = await this.client.send(new client_s3_1.ListPartsCommand(params));
+        return Parts;
+    }
+    _completeMultipartUpload(file) {
+        const params = {
+            Bucket: this.bucket,
+            Key: file.name,
+            UploadId: file.UploadId,
+            MultipartUpload: {
+                Parts: file.Parts?.map(({ ETag, PartNumber }) => ({ ETag, PartNumber }))
+            }
+        };
+        return this.client.send(new client_s3_1.CompleteMultipartUploadCommand(params));
+    }
+    async _abortMultipartUpload(file) {
+        if (file.status === 'completed')
+            return;
+        try {
+            const params = { Bucket: this.bucket, Key: file.name, UploadId: file.UploadId };
+            await this.client.send(new client_s3_1.AbortMultipartUploadCommand(params));
+        }
+        catch (err) {
+            this.logger.error('Abort multipart upload failed', { err });
+        }
+    }
+}
+exports.S3Storage = S3Storage;

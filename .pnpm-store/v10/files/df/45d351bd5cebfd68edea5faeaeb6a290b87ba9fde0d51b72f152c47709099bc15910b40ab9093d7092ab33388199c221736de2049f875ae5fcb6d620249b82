@@ -1,0 +1,587 @@
+import * as i0 from '@angular/core';
+import { InjectionToken, OnInit, EventEmitter, ModuleWithProviders, Provider, OnDestroy } from '@angular/core';
+import * as ngx_uploadx from 'ngx-uploadx';
+import { Observable } from 'rxjs';
+
+/**
+ * Allows canceling some operation by calling cancel().
+ * onCancel callback can be used to execute cleanup logic when cancel is called.
+ * @deprecated Use AbortController instead. Will be removed in next major version.
+ */
+declare class Canceler {
+    /**
+     * Callback function to execute cleanup logic when cancel() is called
+     */
+    onCancel: () => void;
+    /**
+     * Cancels the operation.
+     */
+    cancel(): void;
+}
+
+declare enum ErrorType {
+    NotFound = 0,
+    Auth = 1,
+    Retryable = 2,
+    Fatal = 3
+}
+type ShouldRetryFunction = (code: number, attempts: number) => boolean;
+type KeepPartialFunction = (code: number) => boolean;
+interface RetryConfig {
+    /** Maximum number of retry attempts */
+    maxAttempts?: number;
+    /** Upload not exist status codes */
+    shouldRestartCodes?: number[];
+    /** Bad token? status codes */
+    authErrorCodes?: number[];
+    /** Retryable 4xx status codes */
+    shouldRetryCodes?: number[];
+    /** Overrides the built-in function that determines whether the operation should be repeated */
+    shouldRetry?: ShouldRetryFunction;
+    /** The minimum retry delay */
+    minDelay?: number;
+    /** The maximum retry delay */
+    maxDelay?: number;
+    /** Delay used between retries for non-error responses with missing range/offset */
+    onBusyDelay?: number;
+    /** Time interval after which hanged requests must be retried */
+    timeout?: number;
+    /** Determines whether partial chunks should be kept */
+    keepPartial?: boolean | KeepPartialFunction;
+}
+/**
+ * Retryable ErrorHandler
+ */
+declare class RetryHandler {
+    static readonly STALL_THRESHOLD = 3;
+    attempts: number;
+    config: Required<RetryConfig>;
+    private observedValue?;
+    private repeatCount;
+    cancel: () => void;
+    constructor(configOptions?: RetryConfig);
+    /**
+     * Determine error type based on response code
+     * @param code - HTTP response status code
+     */
+    kind(code: number): ErrorType;
+    /**
+     * Wait before next retry attempt
+     * @param time - Delay in ms
+     */
+    wait(time?: number): Promise<void>;
+    /**
+     * @deprecated Use checkForStall instead
+     */
+    observe(value?: string | number): void;
+    /**
+     * Check if upload is stalled
+     */
+    checkForStall(value?: string | number): boolean;
+}
+
+type ResponseBody = any;
+type RequestHeaders = Record<string, boolean | number | string>;
+type Metadata = Record<string, unknown>;
+interface RequestConfig {
+    body?: BodyInit | null;
+    canceler?: Canceler;
+    signal?: AbortSignal;
+    headers: RequestHeaders;
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
+    onUploadProgress?: (evt: ProgressEvent) => void;
+    responseType?: 'arraybuffer' | 'blob' | 'document' | 'json' | 'text';
+    url: string;
+    timeout?: number;
+    validateStatus?: (status: number) => boolean;
+    withCredentials?: boolean;
+}
+type RequestOptions = Partial<RequestConfig> & {
+    skipAuthorization?: boolean;
+};
+type AuthorizeRequest = (req: RequestConfig, token?: string) => RequestConfig | Promise<RequestConfig>;
+type PreRequest = (req: RequestConfig) => Promise<RequestOptions> | RequestOptions | void;
+type UploadStatus = 'added' | 'queue' | 'uploading' | 'complete' | 'error' | 'cancelled' | 'paused' | 'retry' | 'updated';
+type UploadAction = 'upload' | 'cancel' | 'pause' | 'update';
+interface UploadState {
+    /** Uploaded file */
+    readonly file: File;
+    /** Original file name */
+    readonly name: string;
+    /** Progress percentage */
+    readonly progress: number;
+    /** Estimated remaining time */
+    readonly remaining: number;
+    /** HTTP response body */
+    readonly response: ResponseBody;
+    /** HTTP response status code */
+    readonly responseStatus: number;
+    /** HTTP response headers */
+    readonly responseHeaders: Record<string, string>;
+    /** File size in bytes */
+    readonly size: number;
+    /** Upload speed bytes/sec */
+    readonly speed: number;
+    /** Upload status */
+    readonly status: UploadStatus;
+    /** Unique upload id */
+    readonly uploadId: string;
+    /** File url */
+    readonly url: string;
+}
+interface UploadItem {
+    /**
+     * URL to create new uploads.
+     * @defaultValue '/upload'
+     */
+    endpoint?: string;
+    /**
+     * Headers to be appended to each HTTP request
+     */
+    headers?: RequestHeaders | ((file: File) => RequestHeaders);
+    /**
+     * Custom uploads metadata
+     */
+    metadata?: Metadata | ((file: File) => Metadata);
+    /**
+     * Authorization token as a `string` or function returning a `string` or `Promise<string>`
+     */
+    token?: string | ((httpStatus: number) => string | Promise<string>);
+}
+interface UploadxControlEvent extends UploadItem {
+    readonly uploadId?: string;
+    action?: UploadAction;
+}
+interface UploaderOptions extends UploadItem {
+    retryConfig?: RetryConfig;
+    /**
+     * Set a fixed chunk size.
+     * If not specified, the optimal size will be automatically adjusted based on the network speed.
+     */
+    chunkSize?: number;
+    /** Adaptive chunk size limit */
+    maxChunkSize?: number;
+    withCredentials?: boolean;
+    /**
+     * Set the expected server response type
+     */
+    responseType?: 'json' | 'text' | 'document';
+    /**
+     * Function called before every request
+     */
+    prerequest?: PreRequest;
+    /**
+     * Function used to apply authorization token
+     */
+    authorize?: AuthorizeRequest;
+}
+
+interface AjaxRequestConfig extends RequestOptions {
+    [x: string]: unknown;
+    data?: unknown;
+    url: string;
+}
+interface AjaxResponse<T> {
+    data: T;
+    status: number;
+    headers: Record<string, string>;
+}
+interface Ajax {
+    request: <T = string>(config: AjaxRequestConfig) => Promise<AjaxResponse<T>>;
+}
+declare class UploadxAjax {
+    private buildXhr;
+    constructor(buildXhr: () => XMLHttpRequest);
+    request: <T = string>({ method, data, headers, url, responseType, signal, onUploadProgress, timeout, withCredentials, validateStatus }: AjaxRequestConfig) => Promise<AjaxResponse<T>>;
+    getResponseHeaders(xhr: XMLHttpRequest): Record<string, string>;
+    getResponseBody<T>(xhr: XMLHttpRequest, responseType?: string): T;
+}
+/**
+ * Injection token for the AJAX client used by Uploadx.
+ *
+ * @example
+ * // Using a custom AJAX client (e.g., axios)
+ * import axios from 'axios';
+ * const axiosInstance = axios.create({ });
+ * { provide: UPLOADX_AJAX, useFactory: () => ({ request: axiosInstance.request }) }
+ */
+declare const UPLOADX_AJAX: InjectionToken<Ajax>;
+
+/**
+ * Adaptive chunk size
+ */
+declare class DynamicChunk {
+    /** Maximum chunk size in bytes */
+    static maxSize: number;
+    /** Minimum chunk size in bytes */
+    static minSize: number;
+    /** Initial chunk size in bytes */
+    static size: number;
+    static minChunkTime: number;
+    static maxChunkTime: number;
+    /**
+     * Scales the chunk size based on the throughput.
+     * If the elapsed time to upload a chunk is less than the min time, increase the chunk size.
+     * If the elapsed time is more than the max time, decrease the chunk size.
+     * Keeps the chunk size within the min and max limits.
+     * @param throughput - represents the upload rate in bytes/sec.
+     */
+    static scale(throughput: number): number;
+}
+
+/**
+ * Uploader Base Class
+ */
+declare abstract class Uploader implements UploadState {
+    readonly file: File;
+    readonly options: Readonly<UploaderOptions>;
+    readonly stateChange: (uploader: Uploader) => void;
+    readonly ajax: Ajax;
+    name: string;
+    readonly size: number;
+    readonly uploadId: string;
+    response: ResponseBody;
+    responseStatus: number;
+    responseHeaders: Record<string, string>;
+    progress: number;
+    remaining: number;
+    speed: number;
+    /** Custom headers */
+    headers: RequestHeaders;
+    /** Metadata Object */
+    metadata: Metadata;
+    /** Upload endpoint */
+    endpoint: string;
+    /** Chunk size in bytes */
+    chunkSize: number;
+    /** Auth token/tokenGetter */
+    token: UploadxControlEvent['token'];
+    /** Byte offset within the whole file */
+    offset?: number;
+    /** Retries handler */
+    retry: RetryHandler;
+    abortController: AbortController;
+    /** Set HttpRequest responseType */
+    responseType?: 'json' | 'text' | 'document';
+    protected _authorize: AuthorizeRequest;
+    protected _prerequest: PreRequest;
+    protected _token: string;
+    private _eventsCount;
+    constructor(file: File, options: Readonly<UploaderOptions>, stateChange: (uploader: Uploader) => void, ajax: Ajax);
+    private _url;
+    get url(): string;
+    set url(value: string);
+    private _status;
+    get status(): UploadStatus;
+    /**
+     * Transition uploader to a new status.
+     *  @sideEffects
+     * - Calls this.abort() when transitioning to 'paused'
+     * - Calls this.cleanup() for terminal states
+     * - Emits state change via this.stateChange()
+     */
+    private moveTo;
+    set status(next: UploadStatus);
+    /**
+     * Configure uploader
+     */
+    configure({ metadata, headers, token, endpoint, action }: UploadxControlEvent): void;
+    /**
+     * Starts uploading
+     */
+    upload(): Promise<void>;
+    /**
+     * Performs http requests
+     */
+    request(requestOptions: RequestOptions): Promise<void>;
+    /**
+     * Set auth token string
+     */
+    updateToken: () => string | Promise<string>;
+    /**
+     * Get file URI
+     */
+    protected abstract getFileUrl(): Promise<string>;
+    /**
+     * Send file content and return an offset for the next request
+     */
+    protected abstract sendFileContent(): Promise<number | undefined>;
+    /**
+     * Get an offset for the next request
+     */
+    protected abstract getOffset(): Promise<number | undefined>;
+    /**
+     *  Updating the metadata of the upload
+     */
+    protected update<T = {
+        metadata?: Metadata;
+    }>(_data: T): Promise<string>;
+    protected abort(): void;
+    protected cancel(): Promise<void>;
+    /**
+     * Gets the value from the response
+     */
+    protected getValueFromResponse(key: string): string | null;
+    /**
+     * Get file chunk
+     * @param offset - number of bytes of the file to skip
+     * @param size - chunk size
+     */
+    getChunk(offset?: number, size?: number): {
+        start: number;
+        end: number;
+        body: Blob;
+    };
+    private getRetryAfterFromBackend;
+    private cancelAndSendState;
+    private updateAndSendState;
+    private cleanup;
+    private onProgress;
+}
+
+interface UidService {
+    generateId(uploader: Uploader): Promise<string> | string;
+}
+declare class IdService implements UidService {
+    generateId(uploader: Uploader): Promise<string> | string;
+    static ɵfac: i0.ɵɵFactoryDeclaration<IdService, never>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<IdService>;
+}
+
+/**
+ * Global Module Options
+ */
+interface UploadxOptions extends UploaderOptions {
+    /**
+     * Provide a user-defined class to support another upload protocol or to extend an existing one.
+     * @defaultValue UploadX
+     */
+    uploaderClass?: UploaderClass;
+    /**
+     * Set the maximum parallel uploads
+     * @defaultValue 2
+     */
+    concurrency?: number;
+    /**
+     * Automatically start upload when files added
+     * @defaultValue true
+     */
+    autoUpload?: boolean;
+    /**
+     * File types the user can pick from the file input
+     */
+    allowedTypes?: string;
+    /**
+     * Add 'multiple' attribute
+     * @defaultValue true
+     */
+    multiple?: boolean;
+    /**
+     * Retention time for incomplete uploads
+     * @defaultValue 24
+     */
+    storeIncompleteHours?: number;
+}
+interface UploadxFactoryOptions extends UploadxOptions {
+    endpoint: string;
+    autoUpload: boolean;
+    concurrency: number;
+    uploaderClass: UploaderClass;
+    authorize: AuthorizeRequest;
+    storeIncompleteHours: number;
+}
+type UploaderClass = new (file: File, options: UploaderOptions, stateChange: (uploader: Uploader) => void, ajax: Ajax) => Uploader;
+declare const UPLOADX_FACTORY_OPTIONS: InjectionToken<UploadxFactoryOptions>;
+declare const UPLOADX_OPTIONS: InjectionToken<UploadxOptions>;
+
+declare class Store<T = string> {
+    readonly prefix: string;
+    private ttl;
+    constructor(prefix?: string);
+    set(key: string, value: T): void;
+    get(key: string): T | null;
+    delete(key: string): void;
+    clear(maxAgeHours?: number): void;
+    private keys;
+}
+declare const store: Store<string> | Map<string, string>;
+declare function isLocalStorageAvailable(): boolean;
+
+/**
+ * Implements tus resumable upload protocol
+ * {@link https://github.com/tus/tus-resumable-upload-protocol/blob/master/protocol.md  Github}
+ */
+declare class Tus extends Uploader {
+    headers: {
+        'Tus-Resumable': string;
+    };
+    getFileUrl(): Promise<string>;
+    sendFileContent(): Promise<number | undefined>;
+    getOffset(): Promise<number | undefined>;
+    protected getOffsetFromResponse(): number | undefined;
+}
+
+/**
+ * Implements XHR/CORS Resumable Upload
+ * {@link https://github.com/kukhariev/node-uploadx/blob/master/proto.md Github}
+ * @see {@link https://developers.google.com/drive/api/v3/manage-uploads#resumable Google Drive API documentation}
+ */
+declare class UploaderX extends Uploader {
+    responseType: "json";
+    getFileUrl(): Promise<string>;
+    sendFileContent(): Promise<number | undefined>;
+    getOffset(): Promise<number | undefined>;
+    update<T>(data: T): Promise<string>;
+    protected getOffsetFromResponse(): number | undefined;
+}
+declare function getRangeEnd(range?: string): number;
+
+declare class UploadxDirective implements OnInit {
+    set uploadx(value: UploadxOptions | '');
+    options: UploadxOptions;
+    set control(value: UploadxControlEvent | '');
+    state: EventEmitter<UploadState>;
+    private readonly elementRef;
+    private readonly renderer;
+    private readonly uploadService;
+    ngOnInit(): void;
+    fileChange(event: Event): void;
+    fileListener(files?: FileList | File[]): void;
+    static ɵfac: i0.ɵɵFactoryDeclaration<UploadxDirective, never>;
+    static ɵdir: i0.ɵɵDirectiveDeclaration<UploadxDirective, "[uploadx]", never, { "uploadx": { "alias": "uploadx"; "required": false; }; "options": { "alias": "options"; "required": false; }; "control": { "alias": "control"; "required": false; }; }, { "state": "state"; }, never, never, true, never>;
+}
+
+declare class UploadxDropDirective {
+    active: boolean;
+    fileInput?: UploadxDirective;
+    private readonly uploadService;
+    dropHandler(event: DragEvent): void;
+    onDragOver(event: DragEvent): void;
+    onDragLeave(event: DragEvent): void;
+    /**
+     * Extracts the files from a `DragEvent` object
+     */
+    getFiles(event: DragEvent): FileList | File[];
+    protected _stopEvents(event: DragEvent): void;
+    static ɵfac: i0.ɵɵFactoryDeclaration<UploadxDropDirective, never>;
+    static ɵdir: i0.ɵɵDirectiveDeclaration<UploadxDropDirective, "[uploadxDrop]", never, {}, {}, ["fileInput"], never, true, never>;
+}
+
+declare class UploadxModule {
+    static withConfig(options: UploadxOptions): ModuleWithProviders<UploadxModule>;
+    static ɵfac: i0.ɵɵFactoryDeclaration<UploadxModule, never>;
+    static ɵmod: i0.ɵɵNgModuleDeclaration<UploadxModule, never, [typeof UploadxDirective, typeof UploadxDropDirective], [typeof UploadxDirective, typeof UploadxDropDirective]>;
+    static ɵinj: i0.ɵɵInjectorDeclaration<UploadxModule>;
+}
+
+/**
+ * Provides configuration options for standalone app.
+ *
+ * @example
+ * ```ts
+ * bootstrapApplication(AppComponent, {
+ *   providers: [
+ *     provideUploadx({
+ *       endpoint: uploadUrl,
+ *       allowedTypes: 'video/*,audio/*',
+ *       maxChunkSize: 96 * 1024 * 1024
+ *     })
+ *   ]
+ * });
+ * ```
+ */
+declare function provideUploadx(options?: UploadxOptions): Provider[];
+
+declare const UPLOAD_STATE_KEYS: (keyof UploadState)[];
+declare class UploadxService implements OnDestroy {
+    /** Upload Queue */
+    queue: Uploader[];
+    readonly options: UploadxFactoryOptions;
+    private readonly eventsStream;
+    private subs;
+    private ngZone;
+    readonly ajax: ngx_uploadx.Ajax;
+    private idService;
+    constructor();
+    /** Upload status events */
+    get events(): Observable<UploadState>;
+    /**
+     * Initializes service
+     * @param options global module options
+     * @returns Observable that emits a new value on progress or status changes
+     */
+    init(options?: UploadxOptions): Observable<UploadState>;
+    /**
+     * Initializes service
+     * @param options global module options
+     * @returns Observable that emits the current array of uploaders
+     */
+    connect(options?: UploadxOptions): Observable<Uploader[]>;
+    /**
+     * Terminates all uploads and clears the queue
+     */
+    disconnect(): void;
+    /**
+     * Returns current uploads state
+     * @example
+     * // restore background uploads
+     * this.uploads = this.uploadService.state();
+     */
+    state(): UploadState[];
+    ngOnDestroy(): void;
+    /**
+     * Creates uploaders for files and adds them to the upload queue
+     */
+    handleFiles(files: FileList | File | File[], options?: UploadxOptions): void;
+    /**
+     * Upload control
+     * @example
+     * // pause all
+     * this.uploadService.control({ action: 'pause' });
+     * // pause upload with uploadId
+     * this.uploadService.control({ action: 'pause', uploadId});
+     * // set token
+     * this.uploadService.control({ token: `TOKEN` });
+     */
+    control(evt: UploadxControlEvent): void;
+    /**
+     * Number of active uploads
+     */
+    get activeUploadsCount(): number;
+    /**
+     * Performs http requests
+     */
+    request<T = string>(config: AjaxRequestConfig): Promise<AjaxResponse<T>>;
+    private stateChange;
+    private addUploaderInstance;
+    private processQueue;
+    static ɵfac: i0.ɵɵFactoryDeclaration<UploadxService, never>;
+    static ɵprov: i0.ɵɵInjectableDeclaration<UploadxService>;
+}
+
+declare function resolveUrl(url: string, base: string): string;
+/**
+ * Unwraps a value if it is a function, otherwise returns the value directly.
+ * Useful for allowing values to optionally be specified as functions.
+ */
+declare function unfunc<T, V>(value: T | ((ref: V) => T), ref: V): T;
+declare const pick: <T, K extends keyof T>(obj: T, props: K[]) => Pick<T, K>;
+declare function isNumber(x?: unknown): x is number;
+/**
+ * 32-bit FNV-1a hash function
+ */
+declare function createHash(str: string): number;
+/**
+ * Utility functions for base64 encoding and decoding strings and objects.
+ */
+declare const b64: {
+    encode: (str: string) => string;
+    decode: (str: string) => string;
+    serialize: (obj: Record<string, unknown>) => string;
+    parse: (encoded: string) => Record<string, string>;
+};
+declare function isBrowser(): boolean;
+declare function onLine(): boolean;
+
+export { Canceler, DynamicChunk, ErrorType, IdService, RetryHandler, Store, Tus, UPLOADX_AJAX, UPLOADX_FACTORY_OPTIONS, UPLOADX_OPTIONS, UPLOAD_STATE_KEYS, Uploader, UploaderX, UploadxAjax, UploadxDirective, UploadxDropDirective, UploadxModule, UploadxService, b64, createHash, getRangeEnd, isBrowser, isLocalStorageAvailable, isNumber, onLine, pick, provideUploadx, resolveUrl, store, unfunc };
+export type { Ajax, AjaxRequestConfig, AjaxResponse, AuthorizeRequest, KeepPartialFunction, Metadata, PreRequest, RequestConfig, RequestHeaders, RequestOptions, ResponseBody, RetryConfig, ShouldRetryFunction, UidService, UploadAction, UploadState, UploadStatus, UploaderClass, UploaderOptions, UploadxControlEvent, UploadxFactoryOptions, UploadxOptions };

@@ -1,0 +1,2 @@
+import { n as inspectDevframe, t as createInspectDevframe } from "./src-CzzEF2WN.mjs";
+export { createInspectDevframe, inspectDevframe as default };

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminals</title>
+    <style>
+      html, body, #app { height: 100%; margin: 0; }
+      #app { position: relative; }
+      body { background: #0d1117; }
+      @media (prefers-color-scheme: light) { body { background: #f6f8fa; } }
+    </style>
+    <script type="module" crossorigin src="./assets/index-D0QIzzkb.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-4RGYUf2l.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

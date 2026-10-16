@@ -1,0 +1,353 @@
+import { DevToolsRpcClient, DockEntryState, DockPanelStorage, DocksContext } from "@vitejs/devtools-kit/client";
+import { Ref, ShallowRef, VueElementConstructor } from "vue";
+import { DevToolsDockEntry } from "@vitejs/devtools-kit";
+import { SharedState } from "devframe/utils/shared-state";
+//#region src/client/webcomponents/components/DockEmbedded.d.ts
+declare const DockEmbedded: VueElementConstructor<{
+  context: DocksContext;
+}>;
+//#endregion
+//#region src/client/webcomponents/components/DockStandalone.d.ts
+declare const DockStandalone: VueElementConstructor<{
+  context: DocksContext;
+}>;
+//#endregion
+//#region ../../node_modules/.pnpm/@json-render+core@0.19.0_zod@4.4.3/node_modules/@json-render/core/dist/store-utils-D98Czbil.d.ts
+/**
+ * Confirmation dialog configuration
+ */
+interface ActionConfirm {
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: "default" | "danger";
+}
+/**
+ * Action success handler
+ */
+type ActionOnSuccess = {
+  navigate: string;
+} | {
+  set: Record<string, unknown>;
+} | {
+  action: string;
+};
+/**
+ * Action error handler
+ */
+type ActionOnError = {
+  set: Record<string, unknown>;
+} | {
+  action: string;
+};
+/**
+ * Action binding — maps an event to an action invocation.
+ *
+ * Used inside the `on` field of a UIElement:
+ * ```json
+ * { "on": { "press": { "action": "setState", "params": { "statePath": "/x", "value": 1 } } } }
+ * ```
+ */
+interface ActionBinding {
+  /** Action name (must be in catalog) */
+  action: string;
+  /** Parameters to pass to the action handler */
+  params?: Record<string, DynamicValue>;
+  /** Confirmation dialog before execution */
+  confirm?: ActionConfirm;
+  /** Handler after successful execution */
+  onSuccess?: ActionOnSuccess;
+  /** Handler after failed execution */
+  onError?: ActionOnError;
+  /** Whether to prevent default browser behavior (e.g. navigation on links) */
+  preventDefault?: boolean;
+}
+/**
+ * Dynamic value - can be a literal or a `{ $state }` reference to the state model.
+ *
+ * Used in action params and validation args where values can either be
+ * hardcoded or resolved from state at runtime.
+ */
+type DynamicValue<T = unknown> = T | {
+  $state: string;
+};
+/**
+ * Base UI element structure for v2
+ */
+interface UIElement<T extends string = string, P = Record<string, unknown>> {
+  /** Component type from the catalog */
+  type: T;
+  /** Component props */
+  props: P;
+  /** Child element keys (flat structure) */
+  children?: string[];
+  /** Visibility condition */
+  visible?: VisibilityCondition;
+  /** Event bindings — maps event names to action bindings */
+  on?: Record<string, ActionBinding | ActionBinding[]>;
+  /** Repeat children once per item in a state array */
+  repeat?: {
+    statePath: string;
+    key?: string;
+  };
+  /**
+   * State watchers — maps JSON Pointer state paths to action bindings.
+   * When the value at a watched path changes, the bound actions fire.
+   * Useful for cascading dependencies (e.g. country → city option loading).
+   */
+  watch?: Record<string, ActionBinding | ActionBinding[]>;
+}
+/**
+ * Shared comparison operators for visibility conditions.
+ *
+ * Use at most ONE comparison operator per condition. If multiple are
+ * provided, only the first matching one is evaluated (precedence:
+ * eq > neq > gt > gte > lt > lte). With no operator, truthiness is checked.
+ *
+ * `not` inverts the final result of whichever operator (or truthiness
+ * check) is used.
+ */
+type ComparisonOperators = {
+  eq?: unknown;
+  neq?: unknown;
+  gt?: number | {
+    $state: string;
+  };
+  gte?: number | {
+    $state: string;
+  };
+  lt?: number | {
+    $state: string;
+  };
+  lte?: number | {
+    $state: string;
+  };
+  not?: true;
+};
+/**
+ * A single state-based condition.
+ * Resolves `$state` to a value from the state model, then applies the operator.
+ * Without an operator, checks truthiness.
+ *
+ * When `not` is `true`, the result of the entire condition is inverted.
+ * For example `{ $state: "/count", gt: 5, not: true }` means "NOT greater than 5".
+ */
+type StateCondition = {
+  $state: string;
+} & ComparisonOperators;
+/**
+ * A condition that resolves `$item` to a field on the current repeat item.
+ * Only meaningful inside a `repeat` scope.
+ *
+ * Use `""` to reference the whole item, or `"field"` for a specific field.
+ */
+type ItemCondition = {
+  $item: string;
+} & ComparisonOperators;
+/**
+ * A condition that resolves `$index` to the current repeat array index.
+ * Only meaningful inside a `repeat` scope.
+ */
+type IndexCondition = {
+  $index: true;
+} & ComparisonOperators;
+/** A single visibility condition (state, item, or index). */
+type SingleCondition = StateCondition | ItemCondition | IndexCondition;
+/**
+ * AND wrapper — all child conditions must be true.
+ * This is the explicit form of the implicit array AND (`SingleCondition[]`).
+ * Unlike the implicit form, `$and` supports nested `$or` and `$and` conditions.
+ */
+type AndCondition = {
+  $and: VisibilityCondition[];
+};
+/**
+ * OR wrapper — at least one child condition must be true.
+ */
+type OrCondition = {
+  $or: VisibilityCondition[];
+};
+/**
+ * Visibility condition types.
+ * - `boolean` — always/never
+ * - `SingleCondition` — single condition (`$state`, `$item`, or `$index`)
+ * - `SingleCondition[]` — implicit AND (all must be true)
+ * - `AndCondition` — `{ $and: [...] }`, explicit AND (all must be true)
+ * - `OrCondition` — `{ $or: [...] }`, at least one must be true
+ */
+type VisibilityCondition = boolean | SingleCondition | SingleCondition[] | AndCondition | OrCondition;
+//#endregion
+//#region src/client/webcomponents/json-render/components/Badge.d.ts
+interface BadgeProps {
+  text?: string;
+  variant?: 'default' | 'info' | 'success' | 'warning' | 'danger';
+  title?: string;
+  minWidth?: number;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Button.d.ts
+type BaseVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+interface ButtonProps {
+  label?: string;
+  variant?: BaseVariant;
+  icon?: string;
+  disabled?: boolean;
+  /** Shows `BaseButton`'s spinner in place of `icon` and implies `disabled`. */
+  loading?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Card.d.ts
+interface CardProps {
+  title?: string;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'info' | 'success' | 'warning';
+  interactive?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/CodeBlock.d.ts
+interface CodeBlockProps {
+  code?: string;
+  filename?: string;
+  language?: string;
+  height?: number;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/DataTable.d.ts
+interface DataTableColumn {
+  key: string;
+  label?: string;
+  width?: string;
+}
+interface DataTableProps {
+  columns?: (string | DataTableColumn)[];
+  rows?: Record<string, unknown>[];
+  height?: number;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Divider.d.ts
+interface DividerProps {
+  label?: string;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Icon.d.ts
+interface IconProps {
+  name?: string;
+  size?: number;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/KeyValueTable.d.ts
+interface KeyValueTableProps {
+  data?: Record<string, unknown>;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Link.d.ts
+interface LinkProps {
+  href?: string;
+  label?: string;
+  /** Iconify name, rendered before the label. */
+  icon?: string;
+  /** Open in a new tab. Defaults to `true` for `http(s)` URLs. */
+  external?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Progress.d.ts
+interface ProgressProps {
+  value: number;
+  max?: number;
+  label?: string;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Select.d.ts
+interface SelectOption {
+  value: string;
+  label?: string;
+  /** Iconify name, rendered before the label. */
+  icon?: string;
+  /** Secondary line under the label, also the option's `title`. */
+  description?: string;
+}
+interface SelectProps {
+  /** Two-way bindable via `{ $bindState: '...' }`. */
+  value?: string;
+  options?: (string | SelectOption)[];
+  /** Shown on the trigger while `value` is unset. */
+  placeholder?: string;
+  label?: string;
+  disabled?: boolean;
+  /** Adds a substring filter box at the top of the panel. */
+  searchable?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Stack.d.ts
+interface StackProps {
+  direction?: 'row' | 'column';
+  gap?: number;
+  align?: 'start' | 'center' | 'end' | 'stretch';
+  justify?: 'start' | 'center' | 'end' | 'between' | 'around';
+  padding?: number;
+  wrap?: boolean;
+  flex?: number | string;
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'info' | 'success' | 'warning';
+  interactive?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Switch.d.ts
+interface SwitchProps {
+  /** Two-way bindable via `{ $bindState: '...' }`. */
+  value?: boolean;
+  label?: string;
+  disabled?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Tabs.d.ts
+interface TabDescriptor {
+  value: string;
+  label: string;
+  icon?: string;
+  badge?: string;
+  badgeVariant?: 'default' | 'info' | 'success' | 'warning' | 'danger';
+}
+interface TabsProps {
+  /** `children[i]` renders when `tabs[i]` is active — the two arrays are positional. */
+  tabs: TabDescriptor[];
+  /** Two-way bindable via `{ $bindState: '...' }`; otherwise the tab switches local, uncontrolled state. */
+  value?: string;
+  /** Seeds the uncontrolled case only — ignored once `value` is bound. */
+  defaultValue?: string;
+  orientation?: 'horizontal' | 'vertical';
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Text.d.ts
+interface TextProps {
+  text?: string;
+  variant?: 'heading' | 'subheading' | 'body' | 'caption' | 'code';
+  weight?: 'normal' | 'medium' | 'bold';
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/TextInput.d.ts
+interface TextInputProps {
+  /** Two-way bindable via `{ $bindState: '...' }`. */
+  value?: string;
+  placeholder?: string;
+  label?: string;
+  type?: 'text' | 'search' | 'number' | 'password' | 'email';
+  disabled?: boolean;
+  /** Implies `disabled` and shows a spinner alongside the input. */
+  loading?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/json-render/components/Tree.d.ts
+interface TreeProps {
+  data?: unknown;
+  defaultExpanded?: boolean;
+}
+//#endregion
+//#region src/client/webcomponents/state/docks.d.ts
+declare function DEFAULT_DOCK_PANEL_STORE(): DockPanelStorage;
+declare function createDockEntryState(entry: DevToolsDockEntry, selected: Ref<DevToolsDockEntry | null>): DockEntryState;
+declare function sharedStateToRef<T>(sharedState: SharedState<T>): ShallowRef<T>;
+declare function useDocksEntries(rpc: DevToolsRpcClient): Promise<Ref<DevToolsDockEntry[]>>;
+//#endregion
+export { type BadgeProps, type ButtonProps, type CardProps, type CodeBlockProps, DEFAULT_DOCK_PANEL_STORE, type DataTableColumn, type DataTableProps, type DividerProps, DockEmbedded, DockStandalone, type IconProps, type UIElement as JsonRenderElement, type KeyValueTableProps, type LinkProps, type ProgressProps, type SelectOption, type SelectProps, type StackProps, type SwitchProps, type TabDescriptor, type TabsProps, type TextInputProps, type TextProps, type TreeProps, createDockEntryState, sharedStateToRef, useDocksEntries };

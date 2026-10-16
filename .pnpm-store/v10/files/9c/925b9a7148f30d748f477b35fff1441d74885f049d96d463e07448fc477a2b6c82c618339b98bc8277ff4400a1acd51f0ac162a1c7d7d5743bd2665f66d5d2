@@ -1,0 +1,9 @@
+import type { ColorBits } from '../core/bits';
+/**
+ * Blend (aka mix) two colors together.
+ * @param background The background color
+ * @param overlay The overlay color affected by `opacity`
+ * @param opacity Opacity (alpha) for `overlay`
+ * @param [gamma=1.0] Gamma correction coefficient. `1.0` to match browser behavior, `2.2` for gamma-corrected blending.
+ */
+export declare function blend(background: ColorBits, overlay: ColorBits, opacity: number, gamma?: number): ColorBits;

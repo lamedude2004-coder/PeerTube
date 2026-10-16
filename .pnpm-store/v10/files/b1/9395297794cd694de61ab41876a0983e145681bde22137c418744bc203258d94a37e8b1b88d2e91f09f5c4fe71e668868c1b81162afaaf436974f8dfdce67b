@@ -1,0 +1,8 @@
+import type { ColorBits } from '../core/bits';
+import type { Tokens } from './tokenizer';
+/**
+ * Resolve a color-mix() from its tokenized form.
+ * @param tokens tokenized `color-mix(...)`
+ * @param parseColor parser for the two color arguments (recursive)
+ */
+export declare function resolveColorMix(tokens: Tokens, parseColor: (input: string) => ColorBits): ColorBits;

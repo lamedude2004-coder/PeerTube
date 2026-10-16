@@ -1,0 +1,166 @@
+import { SpawnRequest, TerminalMode, TerminalPreset, TerminalSessionInfo, TerminalsOptions } from "../types.mjs";
+import { DevframeNodeContext } from "devframe/types";
+import { Diagnostic } from "nostics";
+//#region src/node/manager.d.ts
+/**
+ * Owns terminal session lifecycle: spawns PTY / piped backends, streams
+ * their output over the `devframes:plugin:terminals:output` channel (one
+ * stream per session, stable for the session's whole life so restarts reuse
+ * the same id), and mirrors a serializable session list into shared state.
+ */
+declare class TerminalManager {
+  private ctx;
+  private options;
+  readonly shell: string;
+  readonly shellArgs: string[];
+  readonly defaultCwd: string;
+  readonly defaultMode: TerminalMode;
+  readonly allowArbitraryCommands: boolean;
+  readonly presets: TerminalPreset[];
+  private channel;
+  private sessionsState?;
+  private sessions;
+  private ptyAvailable;
+  /** Session ids this manager has registered into the hub (when hubbed). */
+  private hubOwned;
+  constructor(ctx: DevframeNodeContext, options?: TerminalsOptions);
+  /** Resolve shared state, probe the PTY backend, publish the preset catalog. */
+  init(): Promise<void>;
+  /** The hub's terminals subsystem when mounted in a hub, else undefined. */
+  private hubTerminals;
+  list(): TerminalSessionInfo[];
+  getPresets(): TerminalPreset[];
+  private buildEnv;
+  private resolveSpawn;
+  /**
+   * Spawn a session and return its descriptor immediately. The OS process
+   * is launched in the background and streams into the session's stream as
+   * soon as it produces output; clients can subscribe by id right away.
+   */
+  spawn(req?: SpawnRequest): TerminalSessionInfo;
+  private launch;
+  /**
+   * Poll the PTY foreground process name and reflect changes (e.g. `bash`
+   * → `vim` → `bash`) into the session info. The interval is `unref`'d so
+   * it never keeps the process alive on its own.
+   */
+  private startProcessPoll;
+  private stopProcessPoll;
+  write(id: string, data: string): void;
+  resize(id: string, cols: number, rows: number): void;
+  /** Stop the process but keep the session (and its stream) around. */
+  terminate(id: string): void;
+  /** Set a custom display name. Pass an empty string to clear it. */
+  rename(id: string, title: string): void;
+  /** Restart the session's command in place, reusing the same stream id. */
+  restart(id: string): TerminalSessionInfo;
+  /** Kill the process, close the stream, and drop the session. */
+  remove(id: string): void;
+  /**
+   * Drop every stopped (non-running) session this manager owns, closing their
+   * streams and forgetting their scrollback. Sessions still running are left
+   * untouched; aggregated hub sessions aren't owned here so they never appear
+   * in {@link sessions}. Publishes once for the whole sweep.
+   */
+  clearExited(): void;
+  /**
+   * Tear a single session down — kill its process, stop polling, dispose the
+   * OSC inspector, close the sink, and drop it from the store — without
+   * publishing. Callers publish once they've finished mutating the store.
+   */
+  private disposeSession;
+  /** Tear everything down — used on server shutdown and in tests. */
+  dispose(): void;
+  private publish;
+  /**
+   * Push the current session list (own + aggregated hub sessions) into shared
+   * state. Kept separate from {@link publish} so the hub-session listener can
+   * refresh without re-running {@link syncHub} (which would re-emit hub events
+   * and loop).
+   */
+  private refreshSessionsState;
+  /**
+   * Reflect the live session list into the hub's terminals subsystem when this
+   * devframe is mounted in a hub. `ctx.terminals` only exists on a
+   * `DevframeHubContext`, so it's accessed by duck-typing — standalone runtimes
+   * (CLI / Vite / build) have no such property and skip silently. This is what
+   * surfaces the plugin's sessions in the hub's own terminals panel.
+   */
+  private syncHub;
+}
+//#endregion
+//#region src/node/backend.d.ts
+/**
+ * Whether real pseudo-terminals are available in this runtime — i.e. zigpty's
+ * native bindings loaded. Without them interactive sessions still run through
+ * zigpty's pipe-based emulation, with degraded TUI fidelity.
+ */
+declare function isPtyAvailable(): Promise<boolean>;
+//#endregion
+//#region src/node/context.d.ts
+declare function setTerminalManager(ctx: DevframeNodeContext, manager: TerminalManager): void;
+declare function getTerminalManager(ctx: DevframeNodeContext): TerminalManager;
+//#endregion
+//#region src/node/diagnostics.d.ts
+interface ReporterOptions {
+  method?: 'log' | 'warn' | 'error';
+}
+declare function reporter(d: Diagnostic, { method }?: ReporterOptions): void;
+/**
+ * Structured diagnostics for the terminals plugin. Uses the plugin's own
+ * `DP_TERMINALS_` prefix per the built-in plugin convention, keeping it
+ * collision-free with devframe core (`DF`) and the hub (`DF8xxx`).
+ */
+declare const diagnostics: import("nostics").Diagnostics<{
+  readonly DP_TERMINALS_0001: {
+    readonly why: (p: {
+      id: string;
+    }) => string;
+    readonly fix: "Spawn a session first, or refresh the session list.";
+  };
+  readonly DP_TERMINALS_0002: {
+    readonly why: (p: {
+      command: string;
+    }) => string;
+    readonly fix: "Add it to `presets`, or pass `allowArbitraryCommands: true` to createTerminalsDevframe().";
+  };
+  readonly DP_TERMINALS_0003: {
+    readonly why: (p: {
+      id: string;
+    }) => string;
+    readonly fix: "Spawn the session with `mode: \"interactive\"` to accept input.";
+  };
+  readonly DP_TERMINALS_0004: {
+    readonly why: (p: {
+      command: string;
+      reason: string;
+    }) => string;
+  };
+  readonly DP_TERMINALS_0005: {
+    readonly why: "Native PTY bindings (zigpty) are unavailable; interactive sessions fall back to pipe-based terminal emulation. Full-screen TUIs may not render correctly.";
+    readonly fix: "Check that this platform is covered by zigpty's prebuilds (Linux/macOS/Windows, x64/arm64, glibc/musl) and that the dependency installed intact.";
+  };
+  readonly DP_TERMINALS_0006: {
+    readonly why: (p: {
+      id: string;
+    }) => string;
+  };
+  readonly DP_TERMINALS_0007: {
+    readonly why: "Terminals manager is not initialised on this context";
+    readonly fix: "Call setupTerminals(ctx) (or use createTerminalsDevframe) before invoking terminal RPCs.";
+  };
+}, readonly [typeof reporter]>;
+//#endregion
+//#region src/node/index.d.ts
+/**
+ * Wire the terminals subsystem onto a devframe node context: create the
+ * {@link TerminalManager}, publish presets + the session list into shared
+ * state, and register the control RPC functions. Returns the manager so
+ * callers can spawn sessions or dispose it on shutdown.
+ *
+ * Works in any devframe runtime (CLI, Vite, build) — it only depends on the
+ * core `ctx.rpc` streaming + shared-state surface, not on the hub.
+ */
+declare function setupTerminals(ctx: DevframeNodeContext, options?: TerminalsOptions): Promise<TerminalManager>;
+//#endregion
+export { TerminalManager, diagnostics, getTerminalManager, isPtyAvailable, setTerminalManager, setupTerminals };

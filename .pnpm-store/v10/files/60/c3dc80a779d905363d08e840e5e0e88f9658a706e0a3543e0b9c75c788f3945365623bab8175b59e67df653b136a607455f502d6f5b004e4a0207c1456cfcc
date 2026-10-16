@@ -1,0 +1,13 @@
+import { File } from './file';
+import { MetaStorage } from './meta-storage';
+/**
+ * Creates a metadata storage instance based on the provided options.
+ */
+export declare function createMetaStorage<T extends File = File>(options: {
+    metaStorage?: MetaStorage<T>;
+    metaDir?: string;
+    uploadDir?: string;
+    directory?: string;
+    metaStorageOptions?: unknown;
+    metaStorageConfig?: unknown;
+}, metaStorageConstructor?: new (opts: Record<string, unknown>) => MetaStorage<T>): MetaStorage<T>;

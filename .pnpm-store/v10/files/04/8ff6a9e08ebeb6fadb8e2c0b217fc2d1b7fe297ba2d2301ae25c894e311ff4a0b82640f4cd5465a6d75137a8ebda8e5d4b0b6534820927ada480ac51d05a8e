@@ -1,0 +1,25 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createMetaStorage = createMetaStorage;
+const local_meta_storage_1 = require("./local-meta-storage");
+/**
+ * Creates a metadata storage instance based on the provided options.
+ */
+function createMetaStorage(options, metaStorageConstructor) {
+    if (options.metaStorage)
+        return options.metaStorage;
+    const metaOpts = options.metaStorageOptions ?? options.metaStorageConfig;
+    const mergedOptions = { ...options, ...metaOpts };
+    if (options.metaDir) {
+        return new local_meta_storage_1.LocalMetaStorage({ ...mergedOptions, directory: options.metaDir });
+    }
+    if ('directory' in mergedOptions) {
+        return new local_meta_storage_1.LocalMetaStorage(mergedOptions);
+    }
+    if (metaStorageConstructor) {
+        return new metaStorageConstructor(mergedOptions);
+    }
+    return new local_meta_storage_1.LocalMetaStorage({
+        directory: options.uploadDir ?? options.directory ?? ''
+    });
+}

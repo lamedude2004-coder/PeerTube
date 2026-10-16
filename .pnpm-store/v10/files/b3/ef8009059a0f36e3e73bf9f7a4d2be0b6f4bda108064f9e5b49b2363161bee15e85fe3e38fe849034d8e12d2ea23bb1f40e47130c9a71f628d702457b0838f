@@ -1,0 +1,11 @@
+import { TerminalsOptions } from "./types.mjs";
+import { CacHandle, CreateCacOptions } from "devframe/adapters/cac";
+//#region src/cli.d.ts
+/**
+ * Build a standalone CLI for the terminals panel — `dev` / `build` / `mcp`
+ * subcommands, backed by {@link createTerminalsDevframe}. Used by the
+ * package `bin`.
+ */
+declare function createTerminalsCli(options?: TerminalsOptions, cliOptions?: CreateCacOptions): CacHandle;
+//#endregion
+export { createTerminalsCli };

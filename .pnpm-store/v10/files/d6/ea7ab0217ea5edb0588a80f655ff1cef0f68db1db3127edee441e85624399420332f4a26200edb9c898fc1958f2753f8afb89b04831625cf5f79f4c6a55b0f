@@ -1,0 +1,27 @@
+import type { ColorBits } from '../core/bits';
+/** Format to a #RRGGBBAA string */
+export declare const format: typeof formatHEXA;
+/** Format to a #RRGGBBAA string */
+export declare function formatHEXA(color: ColorBits): string;
+export declare function formatHEX(color: ColorBits): string;
+export declare function formatRGBA(color: ColorBits): string;
+export declare function toRGBA(color: ColorBits): {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
+};
+export declare function formatHSLA(color: ColorBits): string;
+export declare function toHSLA(color: ColorBits): {
+    h: number;
+    s: number;
+    l: number;
+    a: number;
+};
+export declare function formatHWBA(color: ColorBits): string;
+export declare function toHWBA(color: ColorBits): {
+    h: number;
+    w: number;
+    b: number;
+    a: number;
+};

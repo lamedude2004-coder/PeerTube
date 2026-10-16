@@ -1,0 +1,5 @@
+/**
+ * Round and clamp a channel value to a [0, 255] byte. NaN passes through so it
+ * packs as 0 in `newColor`.
+ */
+export declare function clampByte(value: number): number;

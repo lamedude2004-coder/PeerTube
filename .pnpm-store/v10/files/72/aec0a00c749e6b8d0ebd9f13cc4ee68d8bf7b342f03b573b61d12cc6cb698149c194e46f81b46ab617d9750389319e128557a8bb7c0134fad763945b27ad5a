@@ -1,0 +1,11 @@
+import { a as RpcFunctionAgentInfo, i as InvokeResult, n as DevframeInspectCommandInfo, o as RpcFunctionInfo, r as DevframeInspectInstanceInfo, t as AgentManifest } from "../types-_vo7QhmS.mjs";
+import { DevframeConnectionStatus, DevframeRpcClient, DevframeRpcClientOptions } from "devframe/client";
+//#region src/client/index.d.ts
+/**
+ * Connect to the inspector's devframe backend. A thin, typed wrapper
+ * around devframe's {@link connectDevframe}; the SPA derives its base
+ * from `document.baseURI`, so no options are required in the common case.
+ */
+declare function connectInspect(options?: DevframeRpcClientOptions): Promise<DevframeRpcClient>;
+//#endregion
+export { type AgentManifest, type DevframeConnectionStatus, type DevframeInspectCommandInfo, type DevframeInspectInstanceInfo, type DevframeRpcClient, type InvokeResult, type RpcFunctionAgentInfo, type RpcFunctionInfo, connectInspect };

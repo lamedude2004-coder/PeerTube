@@ -1,0 +1,3 @@
+import { i as InvokeResult, o as RpcFunctionInfo } from "./types-_vo7QhmS.mjs";
+import { n as createInspectDevframe, r as inspectDevframe, t as InspectDevframeOptions } from "./index-B7KBbd3U.mjs";
+export { InspectDevframeOptions, type InvokeResult, type RpcFunctionInfo, createInspectDevframe, inspectDevframe as default };

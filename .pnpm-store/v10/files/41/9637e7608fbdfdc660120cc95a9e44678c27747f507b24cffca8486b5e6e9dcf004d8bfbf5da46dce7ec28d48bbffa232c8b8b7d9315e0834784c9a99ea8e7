@@ -1,0 +1,17 @@
+import { S3Client, S3ClientConfig } from '@aws-sdk/client-s3';
+import { File, MetaStorage, MetaStorageOptions, UploadList } from '@uploadx/core';
+export type S3MetaStorageOptions = S3ClientConfig & MetaStorageOptions & {
+    bucket?: string;
+    keyFile?: string;
+};
+export declare class S3MetaStorage<T extends File = File> extends MetaStorage<T> {
+    options: S3MetaStorageOptions;
+    bucket: string;
+    client: S3Client;
+    constructor(options: S3MetaStorageOptions);
+    get(id: string): Promise<T>;
+    delete(id: string): Promise<void>;
+    save(id: string, file: T): Promise<T>;
+    list(prefix: string): Promise<UploadList>;
+    toString(): string;
+}

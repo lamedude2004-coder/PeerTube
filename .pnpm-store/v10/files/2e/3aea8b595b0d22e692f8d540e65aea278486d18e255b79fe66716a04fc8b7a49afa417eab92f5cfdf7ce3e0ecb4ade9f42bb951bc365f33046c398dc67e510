@@ -1,0 +1,231 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseStorage = void 0;
+const bytes_1 = __importDefault(require("bytes"));
+const utils_1 = require("../utils");
+const config_1 = require("./config");
+const file_1 = require("./file");
+class BaseStorage {
+    options;
+    onCreate;
+    onUpdate;
+    onComplete;
+    onDelete;
+    onError;
+    maxFileSize;
+    maxMetadataSize;
+    basePath;
+    isReady = true;
+    checksumTypes = [];
+    cache;
+    logger = utils_1.uploadxLogger.getChild(this.constructor.name);
+    validation;
+    namingFunction;
+    _errorResponses = {};
+    config;
+    purgeTimeoutId;
+    constructor(options) {
+        this.options = options;
+        // Configure the logger if a logLevel is specified
+        if (options.logLevel) {
+            (0, utils_1.configureSimpleLogger)(options.logLevel);
+        }
+        const configHandler = new config_1.ConfigHandler();
+        this.config = configHandler.set(options);
+        this.basePath = this.config.basePath || '/files';
+        this.onCreate = (0, utils_1.normalizeHookResponse)(this.config.onCreate);
+        this.onUpdate = (0, utils_1.normalizeHookResponse)(this.config.onUpdate);
+        this.onComplete = (0, utils_1.normalizeHookResponse)(this.config.onComplete);
+        this.onDelete = (0, utils_1.normalizeHookResponse)(this.config.onDelete);
+        this.onError = this.config.onError ?? ((response) => response);
+        this.namingFunction = this.config.namingFunction;
+        this.maxFileSize = bytes_1.default.parse(this.config.maxFileSize);
+        this.maxMetadataSize = bytes_1.default.parse(this.config.maxMetadataSize);
+        this.validation = new utils_1.Validator(undefined, this.errorResponses);
+        this.cache = new utils_1.Cache(1000, 300);
+        this.logger.debug('provided options: {options}', { options });
+        const purgeInterval = (0, utils_1.toMilliseconds)(this.config.expiration?.purgeInterval);
+        if (purgeInterval) {
+            this.startAutoPurge(purgeInterval);
+        }
+        const size = {
+            value: this.maxFileSize,
+            isValid(file) {
+                return file.size <= this.value;
+            },
+            response: utils_1.ErrorMap.RequestEntityTooLarge
+        };
+        const mime = {
+            value: this.config.allowedMimeTypes,
+            isValid(file) {
+                return !!utils_1.typeis.is(file.contentType, this.value);
+            },
+            response: utils_1.ErrorMap.UnsupportedMediaType
+        };
+        const filename = {
+            isValid(file) {
+                return file_1.FileName.isValid(file.name);
+            },
+            response: utils_1.ErrorMap.InvalidFileName
+        };
+        this.validation.add({ size, mime, filename });
+        this.validation.add({ ...this.config.validation });
+    }
+    get errorResponses() {
+        return this._errorResponses;
+    }
+    set errorResponses(value) {
+        Object.assign(this._errorResponses, value);
+    }
+    async validate(file) {
+        return this.validation.verify(file);
+    }
+    normalizeError(error) {
+        return {
+            message: 'Generic Uploadx Error',
+            statusCode: 500,
+            code: 'GenericUploadxError'
+        };
+    }
+    /**
+     * Saves upload metadata
+     */
+    async saveMeta(file) {
+        this.updateTimestamps(file);
+        const prev = { ...this.cache.get(file.id) };
+        this.cache.set(file.id, file);
+        return (0, utils_1.isEqual)(prev, file, 'bytesWritten', 'expiredAt')
+            ? this.meta.touch(file.id, file)
+            : this.meta.save(file.id, file);
+    }
+    /**
+     * Deletes an upload metadata
+     */
+    async deleteMeta(id) {
+        this.cache.delete(id);
+        return this.meta.delete(id);
+    }
+    /**
+     * Retrieves upload metadata.
+     *
+     * @remarks
+     * Returns a shallow copy — nested user metadata objects remain shared with the cache.
+     */
+    async getMeta(id) {
+        let file = this.cache.get(id);
+        if (!file) {
+            try {
+                file = await this.meta.get(id);
+                this.cache.set(file.id, file);
+            }
+            catch {
+                return (0, utils_1.fail)(utils_1.ERRORS.FILE_NOT_FOUND);
+            }
+        }
+        return { ...file, metadata: { ...file.metadata } };
+    }
+    checkIfExpired(file) {
+        if ((0, file_1.isExpired)(file)) {
+            void this.delete(file).catch(() => null);
+            return (0, utils_1.fail)(utils_1.ERRORS.GONE);
+        }
+        return Promise.resolve(file);
+    }
+    /**
+     * Searches for and purges expired uploads
+     * @param maxAge - remove uploads older than a specified age
+     * @param prefix - filter uploads
+     */
+    async purge(maxAge, prefix) {
+        const maxAgeMs = (0, utils_1.toMilliseconds)(maxAge || this.config.expiration?.maxAge);
+        const purged = { items: [], maxAgeMs, prefix };
+        if (maxAgeMs) {
+            const before = Date.now() - maxAgeMs;
+            const expired = (await this.list(prefix)).items.filter(item => +new Date(this.config.expiration?.rolling ? item.modifiedAt || item.createdAt : item.createdAt) < before);
+            let errorCount = 0;
+            const total = expired.length;
+            for (const { id, ...rest } of expired) {
+                const [deleted] = await this.delete({ id });
+                if (deleted.status !== 'deleted') {
+                    errorCount++;
+                }
+                purged.items.push({ ...deleted, ...rest });
+            }
+            const successCount = total - errorCount;
+            if (successCount > 0) {
+                this.logger.info(`Purge: removed ${successCount} uploads`);
+            }
+            if (errorCount > 0) {
+                this.logger.warn('Purge: {errorCount} out of {total} uploads had non‑deleted status', {
+                    errorCount,
+                    total
+                });
+            }
+        }
+        return purged;
+    }
+    async get({ id }) {
+        return this.meta.list(id);
+    }
+    /**
+     * Retrieves a list of uploads whose names begin with the prefix
+     * @experimental
+     */
+    async list(prefix = '') {
+        return this.meta.list(prefix);
+    }
+    /**
+     * Set user-provided metadata as key-value pairs
+     * @experimental
+     */
+    async update({ id }, metadata) {
+        const file = await this.getMeta(id);
+        (0, file_1.updateMetadata)(file, metadata);
+        await this.saveMeta(file);
+        return { ...file, status: 'updated' };
+    }
+    isUnsupportedChecksum(algorithm = '') {
+        return !!algorithm && !this.checksumTypes.includes(algorithm);
+    }
+    startAutoPurge(purgeInterval) {
+        const MAX_TIMER_INTERVAL = 2_147_483_647;
+        const MIN_PURGE_INTERVAL = 60_000;
+        const interval = (0, utils_1.clamp)(purgeInterval, MIN_PURGE_INTERVAL, MAX_TIMER_INTERVAL);
+        if (interval !== purgeInterval) {
+            this.logger.warn('purgeInterval clamped from {value} to {clamped}', {
+                value: purgeInterval,
+                clamped: interval
+            });
+        }
+        const runPurge = () => {
+            this.purge()
+                .catch(err => this.logger.error('purge error: {err}', { err }))
+                .finally(() => {
+                if (this.purgeTimeoutId) {
+                    this.purgeTimeoutId = setTimeout(runPurge, interval).unref();
+                }
+            });
+        };
+        this.purgeTimeoutId = setTimeout(runPurge, interval).unref();
+    }
+    stopAutoPurge() {
+        if (this.purgeTimeoutId) {
+            clearTimeout(this.purgeTimeoutId);
+            this.purgeTimeoutId = undefined;
+        }
+    }
+    updateTimestamps(file) {
+        file.createdAt ??= new Date().toISOString();
+        const maxAgeMs = (0, utils_1.toMilliseconds)(this.config.expiration?.maxAge);
+        if (maxAgeMs) {
+            file.expiredAt = this.config.expiration?.rolling
+                ? new Date(Date.now() + maxAgeMs).toISOString()
+                : new Date(+new Date(file.createdAt) + maxAgeMs).toISOString();
+        }
+        return file;
+    }
+}
+exports.BaseStorage = BaseStorage;

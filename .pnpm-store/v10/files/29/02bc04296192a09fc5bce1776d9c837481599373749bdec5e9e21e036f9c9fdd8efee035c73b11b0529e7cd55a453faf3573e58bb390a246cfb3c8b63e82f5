@@ -1,0 +1,36 @@
+{
+  "name": "detailed-xml-validator",
+  "version": "2.2.0",
+  "type": "module",
+  "description": "Validate  XML schema forbusiness rules and returns all the possible failures",
+  "main": "./src/validator.js",
+  "scripts": {
+    "test": "npx mocha specs/*.spec.js --timeout 5000",
+    "coverage": "npx nyc mocha specs/*.spec.js"
+  },
+  "keywords": [
+    "xsd",
+    "xml",
+    "validator",
+    "detail",
+    "business",
+    "rule",
+    "locales"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NaturalIntelligence/detailed-xml-validator"
+  },
+  "author": "Amit Gupta (https://amitkumargupta.work/)",
+  "license": "MIT",
+  "dependencies": {
+    "@nodable/flexible-xml-parser": "^1.11.2",
+    "@nodable/compact-builder": "^2.0.0",
+    "@nodable/base-output-builder": "^2.0.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "mocha": "^9.1.1",
+    "nyc": "^15.1.0"
+  }
+}

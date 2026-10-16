@@ -1,0 +1,19 @@
+import type { ColorBits } from '../core/bits';
+/**
+ * Modifies color alpha channel.
+ * @param color - ColorBits
+ * @param value - Value in the range [0, 1]
+ */
+export declare function alpha(color: ColorBits, value: number): ColorBits;
+/**
+ * Darkens a color.
+ * @param color - ColorBits
+ * @param coefficient - Multiplier in the range [0, 1]
+ */
+export declare function darken(color: ColorBits, coefficient: number): ColorBits;
+/**
+ * Lighten a color.
+ * @param color - ColorBits
+ * @param coefficient - Multiplier in the range [0, 1]
+ */
+export declare function lighten(color: ColorBits, coefficient: number): ColorBits;

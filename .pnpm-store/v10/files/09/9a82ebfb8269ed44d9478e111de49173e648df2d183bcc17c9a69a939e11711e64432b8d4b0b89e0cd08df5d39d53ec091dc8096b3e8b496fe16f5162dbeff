@@ -1,0 +1,57 @@
+import { PLUGIN_ID } from "./constants.mjs";
+import { fileURLToPath } from "node:url";
+import { defineDevframe } from "devframe/types";
+//#region package.json
+var name = "@devframes/plugin-terminals";
+var version = "0.8.2";
+var description = "Portable, hub-native terminal panel for devframe — readonly output streaming and fully interactive PTY shells (TUI-capable).";
+var homepage = "https://github.com/devframes/devframe#readme";
+//#endregion
+//#region src/index.ts
+/**
+* Build a {@link DevframeDefinition} for the terminals panel. The same
+* definition runs standalone (`createCac`), mounts into a Vite host
+* (`/vite`), or docks inside a hub — its `setup` only relies on the core
+* devframe RPC surface.
+*
+* @experimental This plugin is experimental and may change without a major
+* version bump until it stabilizes.
+*
+* @example
+* ```ts
+* import { createTerminalsDevframe } from '@devframes/plugin-terminals'
+*
+* export default createTerminalsDevframe({
+*   presets: [{ id: 'dev', title: 'pnpm dev', command: 'pnpm', args: ['dev'] }],
+* })
+* ```
+*/
+function createTerminalsDevframe(options = {}) {
+	const distDir = options.distDir ?? fileURLToPath(new URL("../dist/spa", import.meta.url));
+	return defineDevframe({
+		id: PLUGIN_ID,
+		name: "Terminals",
+		version,
+		packageName: name,
+		homepage,
+		description,
+		icon: "ph:terminal-window-duotone",
+		basePath: options.basePath,
+		cli: {
+			command: options.command ?? "devframe-terminals",
+			port: options.port ?? 9011,
+			distDir,
+			auth: options.auth ?? true
+		},
+		spa: { loader: "none" },
+		dock: { category: "~builtin" },
+		async setup(ctx) {
+			const { setupTerminals } = await import("./node/index.mjs");
+			await setupTerminals(ctx, options);
+		}
+	});
+}
+/** Default-configured terminals devframe (interactive shell, no presets). */
+const terminals = createTerminalsDevframe();
+//#endregion
+export { terminals as n, createTerminalsDevframe as t };

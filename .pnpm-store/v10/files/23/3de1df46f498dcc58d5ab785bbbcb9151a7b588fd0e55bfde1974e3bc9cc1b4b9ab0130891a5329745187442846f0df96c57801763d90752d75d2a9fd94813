@@ -1,0 +1,62 @@
+import { inspect } from 'util';
+import { Logger } from '../utils';
+/** @experimental */
+export interface UploadListEntry {
+    /** upload id */
+    id: string;
+    createdAt: string | Date | number;
+    expiredAt?: string | Date | number;
+    modifiedAt?: string | Date | number;
+}
+/** @experimental */
+export interface UploadList {
+    items: UploadListEntry[];
+    prefix?: string;
+}
+export interface MetaStorageOptions {
+    /**
+     * Prefix added to the storage key (file path, Redis key, etc.).
+     * @default ''
+     */
+    prefix?: string;
+    /**
+     * Suffix appended to the storage key.
+     * Prevents name collisions when storing metadata alongside binary files.
+     * @default '.META'
+     */
+    suffix?: string;
+}
+/**
+ * Stores upload metadata
+ */
+export declare class MetaStorage<T> {
+    prefix: string;
+    suffix: string;
+    logger: Logger;
+    constructor(options?: MetaStorageOptions);
+    /**
+     * Saves upload metadata
+     */
+    save(id: string, file: T): Promise<T>;
+    /**
+     * Deletes an upload metadata
+     */
+    delete(id: string): Promise<void>;
+    /**
+     * Retrieves upload metadata
+     */
+    get(id: string): Promise<T>;
+    /**
+     * Mark upload active
+     */
+    touch(id: string, file: T): Promise<T>;
+    /**
+     * Retrieves a list of uploads whose names begin with the prefix
+     * @experimental
+     */
+    list(prefix?: string): Promise<UploadList>;
+    getMetaName(id: string): string;
+    getIdFromMetaName(name: string): string;
+    toString(): string;
+    [inspect.custom](): string;
+}

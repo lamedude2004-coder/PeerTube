@@ -1,0 +1,89 @@
+{
+  "name": "@nodable/flexible-xml-parser",
+  "version": "1.11.3",
+  "description": "Fastest and fully customizable XML parser in pure JS with fully customizable ouput",
+  "main": "./lib/fxp.cjs",
+  "type": "module",
+  "sideEffects": false,
+  "module": "./src/fxp.js",
+  "types": "./src/fxp.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./src/fxp.d.ts",
+        "default": "./src/fxp.js"
+      },
+      "require": {
+        "types": "./lib/fxp.d.cts",
+        "default": "./lib/fxp.cjs"
+      }
+    }
+  },
+  "scripts": {
+    "test": "c8 --reporter=lcov --reporter=text jasmine specs/*spec.js",
+    "bundle": "webpack --config webpack.cjs.config.js",
+    "map": "codebase-map scan && codebase-map format --format dsl --include \"src/**\" > .codebase-map.dsl"
+  },
+  "keywords": [
+    "xml",
+    "sax",
+    "html",
+    "parser",
+    "fast",
+    "flexible",
+    "xml-parser",
+    "xml2js",
+    "xml2json",
+    "xml2xml",
+    "xml2yaml",
+    "stream",
+    "buffer",
+    "bytes",
+    "fast-xml-parser",
+    "xml-naming",
+    "path-expression-matcher"
+  ],
+  "author": "Amit Gupta (https://solothought.com)",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@nodable/base-output-builder": "^2.0.0",
+    "@nodable/compact-builder": "^2.0.0",
+    "path-expression-matcher": "^1.6.2",
+    "xml-naming": "^0.3.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-transform-runtime": "^7.29.0",
+    "@babel/preset-env": "^7.29.2",
+    "@babel/register": "^7.28.6",
+    "@byspec/xml": "^0.1.0",
+    "@nodable/entities": "^2.2.0",
+    "@types/node": "^20.19.37",
+    "babel-loader": "^10.1.1",
+    "c8": "^11.0.0",
+    "codebase-map": "^0.6.1",
+    "jasmine": "^6.1.0",
+    "typescript": "^6.0.2",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^7.0.2"
+  },
+  "files": [
+    "lib/fxp.cjs",
+    "lib/fxp.d.cts",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/nodable"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nodable/flexible-xml-parser.git"
+  }
+}
