@@ -1,0 +1,28 @@
+{
+  "name": "peertube-plugin-mux",
+  "version": "0.0.1",
+  "description": "Upload videos to Mux for storage and processing, and play them from Mux's CDN",
+  "engine": {
+    "peertube": ">=6.0.0"
+  },
+  "homepage": "",
+  "author": "Base44",
+  "bugs": "",
+  "keywords": [
+    "peertube",
+    "plugin",
+    "mux",
+    "video",
+    "storage",
+    "transcoding"
+  ],
+  "library": "./main.js",
+  "clientScripts": [
+    {
+      "script": "client/video-watch.js",
+      "scopes": [
+        "video-watch"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "name": "@devframes/plugin-terminals",
+  "type": "module",
+  "version": "0.8.2",
+  "description": "Portable, hub-native terminal panel for devframe — readonly output streaming and fully interactive PTY shells (TUI-capable).",
+  "author": "Anthony Fu <anthonyfu117@hotmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/devframes/devframe#readme",
+  "repository": {
+    "directory": "plugins/terminals",
+    "type": "git",
+    "url": "git+https://github.com/devframes/devframe.git"
+  },
+  "bugs": "https://github.com/devframes/devframe/issues",
+  "keywords": [
+    "devframe",
+    "devtools",
+    "terminal",
+    "pty",
+    "xterm"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./cli": "./dist/cli.mjs",
+    "./client": "./dist/client/index.mjs",
+    "./constants": "./dist/constants.mjs",
+    "./node": "./dist/node/index.mjs",
+    "./rpc": "./dist/rpc/index.mjs",
+    "./types": "./dist/types.mjs",
+    "./vite": "./dist/vite.mjs",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.mts",
+  "bin": {
+    "devframe-terminals": "./bin.mjs"
+  },
+  "files": [
+    "bin.mjs",
+    "dist"
+  ],
+  "peerDependencies": {
+    "vite": "^8.0.0",
+    "devframe": "0.8.2"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "cac": "^7.0.0",
+    "nostics": "^1.2.0",
+    "zigpty": "^0.2.1"
+  },
+  "devDependencies": {
+    "@antfu/design": "^0.3.3",
+    "@iconify-json/ph": "^1.2.2",
+    "@storybook/svelte-vite": "^10.5.6",
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@types/node": "^26.1.2",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "colorjs.io": "^0.7.1",
+    "get-port-please": "^3.2.0",
+    "h3": "^2.0.1-rc.26",
+    "storybook": "^10.5.6",
+    "svelte": "^5.56.8",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3",
+    "unocss": "^66.7.5",
+    "vite": "^8.2.0",
+    "vite-plugin-css-injected-by-js": "^5.0.2",
+    "vitest": "^4.1.10",
+    "ws": "^8.21.2",
+    "devframe": "0.8.2"
+  },
+  "scripts": {
+    "build": "tsdown && vite build --config src/client/vite.config.ts && vite build --config src/spa/vite.config.ts",
+    "watch": "tsdown --watch",
+    "dev": "node bin.mjs",
+    "storybook": "storybook dev -p 6014",
+    "build-storybook": "storybook build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  }
+}

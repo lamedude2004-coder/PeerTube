@@ -1,0 +1,93 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UploadxError = exports.ErrorMap = exports.ERRORS = void 0;
+exports.isUploadxError = isUploadxError;
+exports.normalizeErrorResponse = normalizeErrorResponse;
+exports.fail = fail;
+const primitives_1 = require("./primitives");
+var ERRORS;
+(function (ERRORS) {
+    ERRORS["BAD_REQUEST"] = "BadRequest";
+    ERRORS["FILE_CONFLICT"] = "FileConflict";
+    ERRORS["FILE_ERROR"] = "FileError";
+    ERRORS["FILE_NOT_ALLOWED"] = "FileNotAllowed";
+    ERRORS["FILE_NOT_FOUND"] = "FileNotFound";
+    ERRORS["FORBIDDEN"] = "Forbidden";
+    ERRORS["GONE"] = "Gone";
+    ERRORS["INVALID_CONTENT_TYPE"] = "InvalidContentType";
+    ERRORS["INVALID_FILE_NAME"] = "InvalidFileName";
+    ERRORS["INVALID_FILE_SIZE"] = "InvalidFileSize";
+    ERRORS["INVALID_RANGE"] = "InvalidRange";
+    ERRORS["METHOD_NOT_ALLOWED"] = "MethodNotAllowed";
+    ERRORS["REQUEST_ENTITY_TOO_LARGE"] = "RequestEntityTooLarge";
+    ERRORS["STORAGE_ERROR"] = "StorageError";
+    ERRORS["TOO_MANY_REQUESTS"] = "TooManyRequests";
+    ERRORS["UNKNOWN_ERROR"] = "UnknownError";
+    ERRORS["UNPROCESSABLE_ENTITY"] = "UnprocessableEntity";
+    ERRORS["UNSUPPORTED_MEDIA_TYPE"] = "UnsupportedMediaType";
+    ERRORS["CHECKSUM_MISMATCH"] = "ChecksumMismatch";
+    ERRORS["UNSUPPORTED_CHECKSUM_ALGORITHM"] = "UnsupportedChecksumAlgorithm";
+    ERRORS["REQUEST_ABORTED"] = "RequestAborted";
+})(ERRORS || (exports.ERRORS = ERRORS = {}));
+class E_ {
+    static errors = {};
+    static _errors = {
+        BadRequest: [400, 'Bad request'],
+        FileConflict: [409, 'File conflict'],
+        FileError: [500, 'Something went wrong writing the file'],
+        FileNotAllowed: [403, 'File not allowed'],
+        FileNotFound: [404, 'Not found'],
+        Forbidden: [403, 'Authenticated user is not allowed access'],
+        Gone: [410, 'Gone'],
+        InvalidContentType: [400, 'Invalid or missing "content-type" header'],
+        InvalidFileName: [400, 'Invalid file name or it cannot be retrieved'],
+        InvalidFileSize: [400, 'File size cannot be retrieved'],
+        InvalidRange: [400, 'Invalid or missing content-range header'],
+        MethodNotAllowed: [405, 'Method not allowed'],
+        RequestEntityTooLarge: [413, 'Request entity too large'],
+        ChecksumMismatch: [460, 'Checksum mismatch'],
+        UnsupportedChecksumAlgorithm: [400, 'Unsupported checksum algorithm'],
+        StorageError: [503, 'Storage error'],
+        TooManyRequests: [429, 'Too many requests'],
+        UnknownError: [500, 'Something went wrong'],
+        UnprocessableEntity: [422, 'Validation failed'],
+        UnsupportedMediaType: [415, 'Unsupported media type'],
+        RequestAborted: [499, 'Request aborted']
+    };
+    static {
+        Object.keys(E_._errors).forEach(code => {
+            const [statusCode, message] = E_._errors[code];
+            E_.errors[code] = { code, message, statusCode };
+        });
+    }
+}
+exports.ErrorMap = E_.errors;
+class UploadxError extends Error {
+    uploadxErrorCode = ERRORS.UNKNOWN_ERROR;
+    cause;
+    constructor(uploadxErrorCode = ERRORS.UNKNOWN_ERROR, message, cause) {
+        super(message || uploadxErrorCode);
+        this.name = 'UploadxError';
+        this.cause = cause;
+        this.uploadxErrorCode = uploadxErrorCode;
+        delete this.stack;
+    }
+}
+exports.UploadxError = UploadxError;
+function isUploadxError(error) {
+    return !!error?.uploadxErrorCode;
+}
+function normalizeErrorResponse(response) {
+    if (!Array.isArray(response)) {
+        const { statusCode = 500, headers, ...rest } = response;
+        return { ...rest, statusCode, headers };
+    }
+    const [statusCode, body = {}, headers] = response;
+    const b = (0, primitives_1.isRecord)(body) ? body : { message: body };
+    return { ...b, statusCode, headers };
+}
+function fail(uploadxErrorCode, cause) {
+    const entry = exports.ErrorMap[uploadxErrorCode];
+    const message = entry?.message;
+    return Promise.reject(new UploadxError(uploadxErrorCode, message, cause));
+}

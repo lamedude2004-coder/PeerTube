@@ -1,0 +1,79 @@
+{
+  "name": "password-generator",
+  "version": "3.0.0",
+  "description": "Memorable password generator for Node and browsers (async WebCrypto).",
+  "author": "Bermi Ferrer <bermi@bermilabs.com>",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "password",
+    "generator",
+    "pass",
+    "random",
+    "browser",
+    "crypto",
+    "security",
+    "webcrypto",
+    "esm"
+  ],
+  "bugs": {
+    "web": "http://github.com/bermi/password-generator/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/bermi/password-generator.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/index.js",
+      "bun": "./dist/index.js",
+      "node": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": "./bin/password-generator.js",
+  "files": [
+    "dist",
+    "bin",
+    "BENCHMARKS.md",
+    "CHANGELOG.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "bun x tsc -p tsconfig.json --noEmit",
+    "build": "bun build src/index.ts --outdir dist --entry-naming \"[name].js\" --format esm --target=browser --sourcemap=linked",
+    "build:cli": "bun build src/cli.ts --outdir dist --entry-naming \"[name].js\" --format esm --target=node --sourcemap=linked",
+    "build:types": "bun x tsc -p tsconfig.types.json",
+    "build:all": "bun run build && bun run build:cli && bun run build:types",
+    "bench": "bun run build && bun run bench/bench.mjs",
+    "bench:constraints": "bun run bench/constraints.mjs",
+    "bench:node": "bun run build && node bench/bench.mjs",
+    "bench:node:constraints": "node bench/constraints.mjs",
+    "bench:browser": "bun run build && bunx playwright test -c bench/playwright.config.mjs",
+    "bench:all": "bun run bench && bun run bench:constraints && bun run bench:node && bun run bench:node:constraints && bun run bench:browser",
+    "format": "bunx prettier --write .",
+    "format:check": "bunx prettier --check .",
+    "typecheck:tests": "bun x tsc -p tests/tsconfig.types.json",
+    "test": "bun test",
+    "test:browser": "bun run build && bunx playwright test",
+    "test:all": "bun test --coverage && bun run typecheck:tests && bun run build && bunx playwright test",
+    "test:watch": "bun test --watch",
+    "ci:local": "act -W .github/workflows/ci.yml --container-architecture linux/arm64 && act -W .github/workflows/browser.yml --container-architecture linux/arm64",
+    "clean": "rm -rf dist coverage tmp playwright-report test-results",
+    "prepublishOnly": "bun run build:all",
+    "publish": "npm publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@playwright/test": "^1.42.0",
+    "typescript": "^5.0.0"
+  }
+}

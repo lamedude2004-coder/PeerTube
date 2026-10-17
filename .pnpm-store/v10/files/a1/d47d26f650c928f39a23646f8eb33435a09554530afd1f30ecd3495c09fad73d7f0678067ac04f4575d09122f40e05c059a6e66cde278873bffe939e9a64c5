@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.clampByte = clampByte;
+/**
+ * Round and clamp a channel value to a [0, 255] byte. NaN passes through so it
+ * packs as 0 in `newColor`.
+ */
+function clampByte(value) {
+    const n = Math.round(value);
+    return n < 0 ? 0 : n > 255 ? 255 : n;
+}
+//# sourceMappingURL=bytes.js.map

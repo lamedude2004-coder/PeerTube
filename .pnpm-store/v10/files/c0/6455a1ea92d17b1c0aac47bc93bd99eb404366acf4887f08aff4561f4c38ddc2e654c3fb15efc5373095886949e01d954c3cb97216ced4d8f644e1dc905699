@@ -1,0 +1,51 @@
+import "./constants.mjs";
+import { t as setupMessages } from "./node-BHIX2b-f.mjs";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { defineDevframe } from "devframe/types";
+//#region package.json
+var name = "@devframes/plugin-messages";
+var version = "0.8.2";
+var description = "Devframe plugin — the hub message feed as a portable panel: browse, filter, and dismiss `ctx.messages` entries from any hub host.";
+var homepage = "https://github.com/devframes/devframe#readme";
+//#endregion
+//#region src/index.ts
+const distDir = fileURLToPath(new URL("../dist/spa", import.meta.url));
+/**
+* Build a {@link DevframeDefinition} for the hub message feed panel —
+* a portable view over `ctx.messages`, ported from vitejs/devtools'
+* built-in Messages view. The same definition runs standalone
+* (`/cli`, `/spa`, `/build`) and mounts into a host (`/vite`, hub);
+* a hub host is what feeds it live entries.
+*
+* @experimental This plugin is experimental and may change without a major
+* version bump until it stabilizes.
+*/
+function createMessagesDevframe(options = {}) {
+	const id = options.id ?? "devframes_plugin_messages";
+	return defineDevframe({
+		id,
+		name: options.name ?? "Messages",
+		version,
+		packageName: name,
+		homepage,
+		description,
+		icon: options.icon ?? "ph:notification-duotone",
+		basePath: options.basePath,
+		cli: {
+			command: id,
+			port: options.port ?? 9014,
+			distDir: existsSync(distDir) ? distDir : void 0,
+			auth: options.auth ?? true
+		},
+		dock: { category: "~builtin" },
+		spa: { loader: "none" },
+		setup(ctx) {
+			setupMessages(ctx);
+		}
+	});
+}
+/** The default messages devframe definition. */
+const messagesDevframe = createMessagesDevframe();
+//#endregion
+export { messagesDevframe as n, createMessagesDevframe as t };

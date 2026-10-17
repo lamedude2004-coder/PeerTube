@@ -1,0 +1,7 @@
+import { install } from "./mod.js";
+
+//#region src/install.ts
+install();
+
+//#endregion
+//# sourceMappingURL=install.js.map

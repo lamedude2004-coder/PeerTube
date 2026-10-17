@@ -1,0 +1,115 @@
+"use strict";
+// Full CSS Color parser: everything the fast `parse` handles (hex + absolute
+// functions) plus named colors, relative colors (`from …`), calc() channels
+// and color-mix(). This is the batteries-included entry (`color-bits/css`);
+// importing it pulls in the named-color table and the relative/color-mix
+// machinery, which is why it is kept separate from the lean `parse` core.
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.namedColors = exports.resolveNamed = exports.colorSpaceModel = exports.colorModel = exports.colorMix = void 0;
+exports.parseCSS = parseCSS;
+const fast_1 = require("./fast");
+const tokenizer_1 = require("./tokenizer");
+const named_colors_1 = require("./named-colors");
+const relative_1 = require("./relative");
+const color_mix_1 = require("./color-mix");
+var color_mix_2 = require("../operations/color-mix");
+Object.defineProperty(exports, "colorMix", { enumerable: true, get: function () { return color_mix_2.colorMix; } });
+var channels_1 = require("../conversion/channels");
+Object.defineProperty(exports, "colorModel", { enumerable: true, get: function () { return channels_1.colorModel; } });
+Object.defineProperty(exports, "colorSpaceModel", { enumerable: true, get: function () { return channels_1.colorSpaceModel; } });
+var named_colors_2 = require("./named-colors");
+Object.defineProperty(exports, "resolveNamed", { enumerable: true, get: function () { return named_colors_2.resolveNamed; } });
+Object.defineProperty(exports, "namedColors", { enumerable: true, get: function () { return named_colors_2.namedColors; } });
+const HASH = 35; // '#'
+const CLOSE = 41; // ')'
+/** Guard against resolvers that keep answering with unresolvable strings. */
+const MAX_DEPTH = 32;
+function isSpace(c) {
+    return c === 32 || c === 9 || c === 10 || c === 13;
+}
+const COLOR_MIX = 'color-mix';
+/** ASCII case-insensitive check that the function name is `color-mix`. */
+function isColorMixName(color, open) {
+    if (open !== COLOR_MIX.length) {
+        return false;
+    }
+    for (let i = 0; i < COLOR_MIX.length; i++) {
+        if ((color.charCodeAt(i) | 0x20) !== COLOR_MIX.charCodeAt(i)) {
+            return false;
+        }
+    }
+    return true;
+}
+/** ASCII case-insensitive check that the first argument is the `from` keyword. */
+function firstArgIsFrom(color, open) {
+    let i = open + 1;
+    while (i < color.length && isSpace(color.charCodeAt(i))) {
+        i++;
+    }
+    return (i + 4 < color.length
+        && (color.charCodeAt(i) | 0x20) === 102 // 'f'
+        && (color.charCodeAt(i + 1) | 0x20) === 114 // 'r'
+        && (color.charCodeAt(i + 2) | 0x20) === 111 // 'o'
+        && (color.charCodeAt(i + 3) | 0x20) === 109 // 'm'
+        && isSpace(color.charCodeAt(i + 4)));
+}
+/**
+ * Parse any CSS Color Module 4/5 color: hex, named colors, rgb()/hsl()/hwb()/
+ * lab()/lch()/oklab()/oklch()/color(), their relative `from …` forms, calc()
+ * channels, and color-mix(). For `currentColor`/system colors, pass
+ * `options.resolve`.
+ */
+function parseCSS(input, options) {
+    return parseAny(input, options, 0);
+}
+function invalid(color) {
+    throw new Error(`parseCSS(): invalid CSS color: "${color}"`);
+}
+function parseAny(input, options, depth) {
+    if (depth > MAX_DEPTH) {
+        throw new Error(`parseCSS(): too many nested color references: "${input}"`);
+    }
+    const color = input.trim();
+    if (color.charCodeAt(0) === HASH) {
+        return (0, fast_1.parseHex)(color);
+    }
+    const open = color.indexOf('(');
+    if (open === -1) {
+        // Bare identifier: named color, transparent, currentColor, system color.
+        const named = (0, named_colors_1.resolveNamed)(color);
+        if (named !== null) {
+            return named;
+        }
+        return resolveExternal(color, options, depth);
+    }
+    if (color.charCodeAt(color.length - 1) !== CLOSE) {
+        invalid(color);
+    }
+    // Slow forms — color-mix(), relative `from` colors, and nested calc()/
+    // functions — need the nesting-aware tokenizer. Everything else (the common
+    // case) goes straight to the fast path and scans the string only once.
+    if (isColorMixName(color, open) || firstArgIsFrom(color, open) || color.indexOf('(', open + 1) !== -1) {
+        const tokens = (0, tokenizer_1.tokenize)(color);
+        if (tokens === null) {
+            invalid(color);
+        }
+        const parseNested = (nested) => parseAny(nested, options, depth + 1);
+        if (tokens.name === 'color-mix') {
+            return (0, color_mix_1.resolveColorMix)(tokens, parseNested);
+        }
+        return (0, relative_1.resolveColorFunction)(tokens, parseNested);
+    }
+    // Absolute function: delegate to the fast path.
+    return (0, fast_1.parse)(color);
+}
+function resolveExternal(name, options, depth) {
+    const resolve = options?.resolve;
+    if (resolve) {
+        const result = resolve(name);
+        if (result !== null && result !== undefined) {
+            return typeof result === 'number' ? result : parseAny(result, options, depth + 1);
+        }
+    }
+    throw new Error(`parseCSS(): unknown color: "${name}"`);
+}
+//# sourceMappingURL=css.js.map

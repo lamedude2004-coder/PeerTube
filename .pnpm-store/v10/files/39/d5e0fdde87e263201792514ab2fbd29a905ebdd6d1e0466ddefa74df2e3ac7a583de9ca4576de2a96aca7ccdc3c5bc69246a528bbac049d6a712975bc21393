@@ -1,0 +1,12 @@
+import { ResponseMetadata } from '@aws-sdk/types';
+/**
+ * SDK V3
+ * A structure containing information about a service or networking error.
+ */
+export interface AWSError extends Error {
+    $metadata: ResponseMetadata;
+    Type?: string;
+    Code?: string;
+    $fault?: 'client' | 'server';
+    $service?: string;
+}

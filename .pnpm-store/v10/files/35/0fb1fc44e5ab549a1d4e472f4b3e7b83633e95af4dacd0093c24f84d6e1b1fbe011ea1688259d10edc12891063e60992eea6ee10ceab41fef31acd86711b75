@@ -1,0 +1,64 @@
+import http from 'http';
+import { Headers, IncomingMessageWithBody, ResponseTuple, UploadxResponse } from '../types/http';
+import { UploadxFile } from '../storages';
+export declare const typeis: {
+    (req: http.IncomingMessage, types: string[]): string | false;
+    is(mime: string, types?: string[]): string | false;
+    hasBody(req: http.IncomingMessage): number | false;
+};
+/**
+ * Reads the body from the request.
+ * @param req - request object
+ * @param encoding - encoding to use
+ * @param limit - optional limit on the size of the body
+ */
+export declare function readBody(req: http.IncomingMessage, encoding?: BufferEncoding, limit?: number): Promise<string>;
+/**
+ * Reads the body of the incoming metadata request and parses it as JSON.
+ * @param req - incoming metadata request
+ * @param limit - optional limit on the size of the body
+ */
+export declare function getJsonBody<T = Record<string, any>>(req: IncomingMessageWithBody<Record<any, any>>, limit?: number): Promise<T>;
+/**
+ * Retrieve the value of a specific header of an HTTP request.
+ * @param req - request object
+ * @param name - name of the header
+ * @param all - if true, returns  all values of the header, comma-separated, otherwise returns the last value.
+ */
+export declare function getHeader(req: http.IncomingMessage, name: string, all?: boolean): string;
+/**
+ * Appends value to the end of the multi-value header
+ */
+export declare function appendHeader(res: http.ServerResponse, name: string, value: http.OutgoingHttpHeader): void;
+/**
+ * Sets the value of a specific header of an HTTP response.
+ */
+export declare function setHeaders(res: http.ServerResponse, headers?: Headers): void;
+/**
+ * Try build a protocol:hostname:port string from a request object.
+ */
+export declare function getBaseUrl(req: http.IncomingMessage): string;
+export declare function responseToTuple(response: UploadxResponse | ResponseTuple): ResponseTuple;
+export declare function tupleToResponse(response: ResponseTuple | UploadxResponse): UploadxResponse;
+export declare function normalizeHookResponse<T>(fn: (file: T) => unknown): (file: T) => Promise<{
+    statusCode: number;
+    headers: Headers;
+    body: {};
+} | {
+    body: {};
+    statusCode?: undefined;
+    headers?: undefined;
+}>;
+/**
+ * Extracts UploadxFile from request after upload completes when next handler is provided.
+ * @example
+ * ```ts
+ * app.use('/files', uploadx.upload({ directory: '/tmp' }), (req, res) => {
+ *   const file = getUploadxFile(req);
+ *   return res.json(file);
+ * });
+ * // with type narrowing
+ * const s3File = getUploadxFile<S3File>(req);
+ * ```
+ */
+export declare function getUploadxFile<T extends UploadxFile = UploadxFile>(req: IncomingMessageWithBody): T | undefined;

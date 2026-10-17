@@ -1,0 +1,40 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.alpha = alpha;
+exports.darken = darken;
+exports.lighten = lighten;
+const bits_1 = require("../core/bits");
+/**
+ * Modifies color alpha channel.
+ * @param color - ColorBits
+ * @param value - Value in the range [0, 1]
+ */
+function alpha(color, value) {
+    return (0, bits_1.setAlpha)(color, Math.round(value * 255));
+}
+/**
+ * Darkens a color.
+ * @param color - ColorBits
+ * @param coefficient - Multiplier in the range [0, 1]
+ */
+function darken(color, coefficient) {
+    const r = (0, bits_1.getRed)(color);
+    const g = (0, bits_1.getGreen)(color);
+    const b = (0, bits_1.getBlue)(color);
+    const a = (0, bits_1.getAlpha)(color);
+    const factor = 1 - coefficient;
+    return (0, bits_1.newColor)(r * factor, g * factor, b * factor, a);
+}
+/**
+ * Lighten a color.
+ * @param color - ColorBits
+ * @param coefficient - Multiplier in the range [0, 1]
+ */
+function lighten(color, coefficient) {
+    const r = (0, bits_1.getRed)(color);
+    const g = (0, bits_1.getGreen)(color);
+    const b = (0, bits_1.getBlue)(color);
+    const a = (0, bits_1.getAlpha)(color);
+    return (0, bits_1.newColor)(r + (255 - r) * coefficient, g + (255 - g) * coefficient, b + (255 - b) * coefficient, a);
+}
+//# sourceMappingURL=adjust.js.map

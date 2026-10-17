@@ -1,0 +1,9 @@
+import { File } from './file';
+import { BaseStorageOptions } from './storage';
+export declare class ConfigHandler<T extends File = File> {
+    static defaults: BaseStorageOptions<File>;
+    private static aliasMap;
+    private _config;
+    set(config?: Partial<BaseStorageOptions<T>>): Required<BaseStorageOptions<T>>;
+    get(): BaseStorageOptions<T>;
+}

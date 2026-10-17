@@ -1,0 +1,8 @@
+/**
+ * Evaluate a calc() expression against channel keyword bindings.
+ * @param body the expression, with or without the outer `calc(` `)`, e.g.
+ *   "calc(l * 0.8)" or "l * 0.8"; nested calc() is supported
+ * @param scope channel keyword bindings
+ * @param range percentage reference for the destination channel
+ */
+export declare function evaluateCalc(body: string, scope: Map<string, number>, range: number): number;

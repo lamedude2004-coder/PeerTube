@@ -1,0 +1,4 @@
+import { DiskStorageOptions } from '../storages';
+export declare const DEFAULT_PREFIX = "";
+export declare const commonFromEnv: (prefix?: string) => Partial<DiskStorageOptions>;
+export declare const fromEnv: (prefix?: string) => Partial<DiskStorageOptions>;

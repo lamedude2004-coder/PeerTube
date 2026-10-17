@@ -1,0 +1,89 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.format = void 0;
+exports.formatHEXA = formatHEXA;
+exports.formatHEX = formatHEX;
+exports.formatRGBA = formatRGBA;
+exports.toRGBA = toRGBA;
+exports.formatHSLA = formatHSLA;
+exports.toHSLA = toHSLA;
+exports.formatHWBA = formatHWBA;
+exports.toHWBA = toHWBA;
+const core = __importStar(require("../core/bits"));
+const channels_1 = require("../conversion/channels");
+const { getRed, getGreen, getBlue, getAlpha } = core;
+// Scratch for srgbToHsl/srgbToHwb results; read out before the next call.
+const SCRATCH = new Float64Array(3);
+/**
+ * Map 8-bits value to its hexadecimal representation
+ * ['00', '01', '02', ..., 'fe', 'ff']
+ */
+const FORMAT_HEX = Array.from({ length: 256 })
+    .map((_, byte) => byte.toString(16).padStart(2, '0'));
+/** Format to a #RRGGBBAA string */
+exports.format = formatHEXA;
+/** Format to a #RRGGBBAA string */
+function formatHEXA(color) {
+    return ('#' +
+        FORMAT_HEX[getRed(color)] +
+        FORMAT_HEX[getGreen(color)] +
+        FORMAT_HEX[getBlue(color)] +
+        FORMAT_HEX[getAlpha(color)]);
+}
+function formatHEX(color) {
+    return ('#' +
+        FORMAT_HEX[getRed(color)] +
+        FORMAT_HEX[getGreen(color)] +
+        FORMAT_HEX[getBlue(color)]);
+}
+function formatRGBA(color) {
+    return `rgba(${getRed(color)} ${getGreen(color)} ${getBlue(color)} / ${getAlpha(color) / 255})`;
+}
+function toRGBA(color) {
+    return {
+        r: getRed(color),
+        g: getGreen(color),
+        b: getBlue(color),
+        a: getAlpha(color),
+    };
+}
+function formatHSLA(color) {
+    (0, channels_1.srgbToHsl)(getRed(color) / 255, getGreen(color) / 255, getBlue(color) / 255, SCRATCH);
+    return `hsla(${SCRATCH[0]} ${SCRATCH[1]}% ${SCRATCH[2]}% / ${getAlpha(color) / 255})`;
+}
+function toHSLA(color) {
+    (0, channels_1.srgbToHsl)(getRed(color) / 255, getGreen(color) / 255, getBlue(color) / 255, SCRATCH);
+    return { h: SCRATCH[0], s: SCRATCH[1], l: SCRATCH[2], a: getAlpha(color) / 255 };
+}
+function formatHWBA(color) {
+    (0, channels_1.srgbToHwb)(getRed(color) / 255, getGreen(color) / 255, getBlue(color) / 255, SCRATCH);
+    return `hwb(${SCRATCH[0]} ${SCRATCH[1]}% ${SCRATCH[2]}% / ${getAlpha(color) / 255})`;
+}
+function toHWBA(color) {
+    (0, channels_1.srgbToHwb)(getRed(color) / 255, getGreen(color) / 255, getBlue(color) / 255, SCRATCH);
+    return { h: SCRATCH[0], w: SCRATCH[1], b: SCRATCH[2], a: getAlpha(color) / 255 };
+}
+//# sourceMappingURL=index.js.map

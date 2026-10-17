@@ -1,0 +1,353 @@
+"use strict";
+// Canonical per-colorspace channel math, in CSS Color 4 "keyword" units:
+//
+//   hsl:    h in degrees, s/l in 0..100
+//   hwb:    h in degrees, w/b in 0..100
+//   lab:    l in 0..100,  a/b raw (~ ±125)
+//   lch:    l in 0..100,  c raw (~0..150),  h in degrees
+//   oklab:  l in 0..1,    a/b raw (~ ±0.4)
+//   oklch:  l in 0..1,    c raw (~0..0.4),  h in degrees
+//   color(): channels in 0..1
+//
+// The forward direction (`*ToColor`) takes these units plus an alpha byte and
+// returns ColorBits directly — no intermediate array, so the hot HSL/HWB paths
+// allocate nothing. The reverse direction (`srgbTo*`) takes sRGB in [0, 1] and
+// writes the channel values into a caller-owned buffer it returns, for binding
+// relative-color keywords and for color-mix(). Both the fast parser and the
+// relative parser route through here, guaranteeing identical results for the
+// same nominal color.
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.srgbToColor = srgbToColor;
+exports.hslToColor = hslToColor;
+exports.srgbToHsl = srgbToHsl;
+exports.hwbToColor = hwbToColor;
+exports.srgbToHwb = srgbToHwb;
+exports.labToColor = labToColor;
+exports.srgbToLab = srgbToLab;
+exports.lchToColor = lchToColor;
+exports.srgbToLch = srgbToLch;
+exports.oklabToColor = oklabToColor;
+exports.srgbToOklab = srgbToOklab;
+exports.oklchToColor = oklchToColor;
+exports.srgbToOklch = srgbToOklch;
+exports.colorSpaceChannels = colorSpaceChannels;
+exports.colorSpaceToSrgb = colorSpaceToSrgb;
+exports.colorSpaceToColor = colorSpaceToColor;
+exports.srgbToColorSpace = srgbToColorSpace;
+exports.colorModel = colorModel;
+exports.colorSpaceModel = colorSpaceModel;
+const bits_1 = require("../core/bits");
+const bytes_1 = require("../core/bytes");
+const color_spaces_1 = require("./color-spaces");
+// Single scratch buffer for the *ToColor chains, which have no out parameter
+// of their own. Safe to share: conversions are synchronous, never reentrant,
+// and results are read out before the next conversion runs.
+const SCRATCH = new Float64Array(3);
+/** sRGB component in [0, 1] -> clamped byte in [0, 255]. */
+function to255(v) {
+    return (0, bytes_1.clampByte)(v * 255);
+}
+/** Build ColorBits from sRGB components in [0, 1] and an alpha byte (0..255). */
+function srgbToColor(r, g, b, a) {
+    return (0, bits_1.newColor)(to255(r), to255(g), to255(b), a);
+}
+// HSL
+// t must be within [-1, 2): a single ±1 wrap brings it into [0, 1). Callers
+// guarantee this by normalizing the hue first, so t = h/360 ± 1/3 ∈ [-1/3, 4/3).
+function hueToRGB(p, q, t) {
+    if (t < 0) {
+        t += 1;
+    }
+    if (t > 1) {
+        t -= 1;
+    }
+    if (t < 1 / 6) {
+        return p + (q - p) * 6 * t;
+    }
+    if (t < 1 / 2) {
+        return q;
+    }
+    if (t < 2 / 3) {
+        return p + (q - p) * (2 / 3 - t) * 6;
+    }
+    return p;
+}
+/**
+ * @param h degrees, any value (wrapped by 360°)
+ * @param s nominally 0..100 (clamped)
+ * @param l nominally 0..100 (clamped)
+ * @param a alpha byte
+ */
+function hslToColor(h, s, l, a) {
+    // CSS: hue wraps by 360°; saturation/lightness clamp to [0%, 100%]. The
+    // wrap stays in degrees where the modulo is exact for integer hues.
+    if (h < 0 || h >= 360) {
+        h = ((h % 360) + 360) % 360;
+    }
+    if (s < 0) {
+        s = 0;
+    }
+    else if (s > 100) {
+        s = 100;
+    }
+    if (l < 0) {
+        l = 0;
+    }
+    else if (l > 100) {
+        l = 100;
+    }
+    h /= 360;
+    s /= 100;
+    l /= 100;
+    // With s and l clamped, all channels stay in [0, 1]: no clamping needed.
+    let r, g, b;
+    if (s === 0) {
+        r = g = b = Math.round(l * 255); // achromatic
+    }
+    else {
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = Math.round(hueToRGB(p, q, h + 1 / 3) * 255);
+        g = Math.round(hueToRGB(p, q, h) * 255);
+        b = Math.round(hueToRGB(p, q, h - 1 / 3) * 255);
+    }
+    return (0, bits_1.newColor)(r, g, b, a);
+}
+// https://www.30secondsofcode.org/js/s/rgb-hex-hsl-hsb-color-format-conversion/
+/** @param sRGB in [0, 1] @returns out as [h degrees, s 0..100, l 0..100] */
+function srgbToHsl(r, g, b, out) {
+    const max = Math.max(r, g, b);
+    const s = max - Math.min(r, g, b);
+    const h = s
+        ? max === r
+            ? (g - b) / s
+            : max === g
+                ? 2 + (b - r) / s
+                : 4 + (r - g) / s
+        : 0;
+    // Saturation branches on lightness (= (2*max - s) / 2), not on max.
+    out[0] = 60 * h < 0 ? 60 * h + 360 : 60 * h;
+    out[1] = 100 * (s ? (2 * max - s <= 1 ? s / (2 * max - s) : s / (2 - (2 * max - s))) : 0);
+    out[2] = (100 * (2 * max - s)) / 2;
+    return out;
+}
+// HWB
+/**
+ * @param h degrees, any value (wrapped by 360°)
+ * @param w nominally 0..100 (clamped)
+ * @param b nominally 0..100 (clamped)
+ * @param a alpha byte
+ */
+function hwbToColor(h, w, b, a) {
+    // CSS: hue wraps by 360°; whiteness/blackness clamp to [0%, 100%]
+    if (h < 0 || h >= 360) {
+        h = ((h % 360) + 360) % 360;
+    }
+    if (w < 0) {
+        w = 0;
+    }
+    else if (w > 100) {
+        w = 100;
+    }
+    if (b < 0) {
+        b = 0;
+    }
+    else if (b > 100) {
+        b = 100;
+    }
+    w /= 100;
+    b /= 100;
+    h /= 360;
+    // https://drafts.csswg.org/css-color-4/#hwb-to-rgb
+    if (w + b >= 1) {
+        const gray = to255(w / (w + b)); // achromatic
+        return (0, bits_1.newColor)(gray, gray, gray, a);
+    }
+    // Pure hue (HSL with s = 1, l = 0.5 reduces to p = 0, q = 1), then apply
+    // whiteness/blackness: channel * (1 - w - b) + w. With w and b clamped and
+    // w + b < 1, the result stays in [0, 1]: no clamping needed.
+    const scale = 1 - w - b;
+    return (0, bits_1.newColor)(Math.round((hueToRGB(0, 1, h + 1 / 3) * scale + w) * 255), Math.round((hueToRGB(0, 1, h) * scale + w) * 255), Math.round((hueToRGB(0, 1, h - 1 / 3) * scale + w) * 255), a);
+}
+// https://stackoverflow.com/a/29463581/3112706
+/** @param sRGB in [0, 1] @returns out as [h degrees, w 0..100, b 0..100] */
+function srgbToHwb(r, g, b, out) {
+    srgbToHsl(r, g, b, out);
+    out[1] = Math.min(r, g, b) * 100;
+    out[2] = (1 - Math.max(r, g, b)) * 100;
+    return out;
+}
+// Lab / LCH
+/** @param l 0..100 @param a raw @param b raw @param alpha alpha byte */
+function labToColor(l, a, b, alpha) {
+    (0, color_spaces_1.labToXyzd50)(l, a, b, SCRATCH);
+    (0, color_spaces_1.xyzd50ToSrgb)(SCRATCH[0], SCRATCH[1], SCRATCH[2], SCRATCH);
+    return srgbToColor(SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha);
+}
+/** @param sRGB in [0, 1] @returns out as [l 0..100, a raw, b raw] */
+function srgbToLab(r, g, b, out) {
+    (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+    return (0, color_spaces_1.xyzd50ToLab)(out[0], out[1], out[2], out);
+}
+/** @param l 0..100 @param c raw @param h degrees @param alpha alpha byte */
+function lchToColor(l, c, h, alpha) {
+    (0, color_spaces_1.lchToLab)(l, c, h, SCRATCH);
+    (0, color_spaces_1.labToXyzd50)(SCRATCH[0], SCRATCH[1], SCRATCH[2], SCRATCH);
+    (0, color_spaces_1.xyzd50ToSrgb)(SCRATCH[0], SCRATCH[1], SCRATCH[2], SCRATCH);
+    return srgbToColor(SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha);
+}
+/** @param sRGB in [0, 1] @returns out as [l 0..100, c raw, h degrees] */
+function srgbToLch(r, g, b, out) {
+    (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+    (0, color_spaces_1.xyzd50ToLab)(out[0], out[1], out[2], out);
+    return (0, color_spaces_1.labToLch)(out[0], out[1], out[2], out);
+}
+// OKLab / OKLCH
+/** @param l 0..1 @param a raw @param b raw @param alpha alpha byte */
+function oklabToColor(l, a, b, alpha) {
+    (0, color_spaces_1.oklabToXyzd65)(l, a, b, SCRATCH);
+    (0, color_spaces_1.xyzd65ToD50)(SCRATCH[0], SCRATCH[1], SCRATCH[2], SCRATCH);
+    (0, color_spaces_1.xyzd50ToSrgb)(SCRATCH[0], SCRATCH[1], SCRATCH[2], SCRATCH);
+    return srgbToColor(SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha);
+}
+/** @param sRGB in [0, 1] @returns out as [l 0..1, a raw, b raw] */
+function srgbToOklab(r, g, b, out) {
+    (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+    (0, color_spaces_1.xyzd50ToD65)(out[0], out[1], out[2], out);
+    return (0, color_spaces_1.xyzd65ToOklab)(out[0], out[1], out[2], out);
+}
+/** @param l 0..1 @param c raw @param h degrees @param alpha alpha byte */
+function oklchToColor(l, c, h, alpha) {
+    (0, color_spaces_1.oklchToXyzd50)(l, c, h, SCRATCH);
+    (0, color_spaces_1.xyzd50ToSrgb)(SCRATCH[0], SCRATCH[1], SCRATCH[2], SCRATCH);
+    return srgbToColor(SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha);
+}
+/** @param sRGB in [0, 1] @returns out as [l 0..1, c raw, h degrees] */
+function srgbToOklch(r, g, b, out) {
+    (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+    return (0, color_spaces_1.xyzd50ToOklch)(out[0], out[1], out[2], out);
+}
+// color() predefined color spaces
+// https://drafts.csswg.org/css-color-4/#predefined
+/** Channel keywords exposed by color(from <origin> <space> …) per color space. */
+function colorSpaceChannels(space) {
+    switch (space) {
+        case 'srgb':
+        case 'srgb-linear':
+        case 'display-p3':
+        case 'a98-rgb':
+        case 'prophoto-rgb':
+        case 'rec2020':
+            return ['r', 'g', 'b'];
+        case 'xyz':
+        case 'xyz-d65':
+        case 'xyz-d50':
+            return ['x', 'y', 'z'];
+        default:
+            return null;
+    }
+}
+/** @param channels in 0..1 @returns out as sRGB in [0, 1], or null for an unknown space */
+function colorSpaceToSrgb(space, c1, c2, c3, out) {
+    switch (space) {
+        case 'srgb':
+            out[0] = c1;
+            out[1] = c2;
+            out[2] = c3;
+            return out;
+        case 'srgb-linear':
+            (0, color_spaces_1.srgbLinearToXyzd50)(c1, c2, c3, out);
+            break;
+        case 'display-p3':
+            (0, color_spaces_1.displayP3ToXyzd50)(c1, c2, c3, out);
+            break;
+        case 'a98-rgb':
+            (0, color_spaces_1.adobeRGBToXyzd50)(c1, c2, c3, out);
+            break;
+        case 'prophoto-rgb':
+            (0, color_spaces_1.proPhotoToXyzd50)(c1, c2, c3, out);
+            break;
+        case 'rec2020':
+            (0, color_spaces_1.rec2020ToXyzd50)(c1, c2, c3, out);
+            break;
+        case 'xyz':
+        case 'xyz-d65':
+            (0, color_spaces_1.xyzd65ToD50)(c1, c2, c3, out);
+            break;
+        case 'xyz-d50':
+            out[0] = c1;
+            out[1] = c2;
+            out[2] = c3;
+            break;
+        default: return null;
+    }
+    return (0, color_spaces_1.xyzd50ToSrgb)(out[0], out[1], out[2], out);
+}
+/** @param channels in 0..1 @returns ColorBits, or null for an unknown space */
+function colorSpaceToColor(space, c1, c2, c3, alpha) {
+    if (colorSpaceToSrgb(space, c1, c2, c3, SCRATCH) === null) {
+        return null;
+    }
+    return srgbToColor(SCRATCH[0], SCRATCH[1], SCRATCH[2], alpha);
+}
+/** @param sRGB in [0, 1] @returns out as the space's channels in 0..1, or null for an unknown space */
+function srgbToColorSpace(space, r, g, b, out) {
+    switch (space) {
+        case 'srgb':
+            out[0] = r;
+            out[1] = g;
+            out[2] = b;
+            return out;
+        case 'srgb-linear':
+            (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+            return (0, color_spaces_1.xyzd50TosRGBLinear)(out[0], out[1], out[2], out);
+        case 'display-p3':
+            (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+            return (0, color_spaces_1.xyzd50ToDisplayP3)(out[0], out[1], out[2], out);
+        case 'a98-rgb':
+            (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+            return (0, color_spaces_1.xyzd50ToAdobeRGB)(out[0], out[1], out[2], out);
+        case 'prophoto-rgb':
+            (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+            return (0, color_spaces_1.xyzd50ToProPhoto)(out[0], out[1], out[2], out);
+        case 'rec2020':
+            (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+            return (0, color_spaces_1.xyzd50ToRec2020)(out[0], out[1], out[2], out);
+        case 'xyz':
+        case 'xyz-d65':
+            (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+            return (0, color_spaces_1.xyzd50ToD65)(out[0], out[1], out[2], out);
+        case 'xyz-d50': return (0, color_spaces_1.srgbToXyzd50)(r, g, b, out);
+        default: return null;
+    }
+}
+const F = false;
+const T = true;
+const COLOR_MODELS = {
+    hsl: { keys: ['h', 's', 'l'], ranges: [360, 100, 100], hues: [T, F, F], fromSrgb: srgbToHsl, toColor: hslToColor },
+    hwb: { keys: ['h', 'w', 'b'], ranges: [360, 100, 100], hues: [T, F, F], fromSrgb: srgbToHwb, toColor: hwbToColor },
+    lab: { keys: ['l', 'a', 'b'], ranges: [100, 125, 125], hues: [F, F, F], fromSrgb: srgbToLab, toColor: labToColor },
+    lch: { keys: ['l', 'c', 'h'], ranges: [100, 150, 360], hues: [F, F, T], fromSrgb: srgbToLch, toColor: lchToColor },
+    oklab: { keys: ['l', 'a', 'b'], ranges: [1, 0.4, 0.4], hues: [F, F, F], fromSrgb: srgbToOklab, toColor: oklabToColor },
+    oklch: { keys: ['l', 'c', 'h'], ranges: [1, 0.4, 360], hues: [F, F, T], fromSrgb: srgbToOklch, toColor: oklchToColor },
+};
+/** Model for a color-model name (hsl, oklch, …), or null. Own-key lookup so
+ * that Object.prototype names ('constructor', '__proto__') are not models. */
+function colorModel(name) {
+    return Object.prototype.hasOwnProperty.call(COLOR_MODELS, name) ? COLOR_MODELS[name] : null;
+}
+/** Model for a color() predefined space (channels in 0..1), or null. */
+function colorSpaceModel(space) {
+    const keys = colorSpaceChannels(space);
+    if (keys === null) {
+        return null;
+    }
+    return {
+        keys: keys,
+        ranges: [1, 1, 1],
+        hues: [F, F, F],
+        fromSrgb: (r, g, b, out) => srgbToColorSpace(space, r, g, b, out),
+        toColor: (c1, c2, c3, alpha) => colorSpaceToColor(space, c1, c2, c3, alpha),
+    };
+}
+//# sourceMappingURL=channels.js.map

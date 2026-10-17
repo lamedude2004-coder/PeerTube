@@ -1,0 +1,17 @@
+{
+  "previewPort": 3000,
+  "healthPath": "/",
+  "startCommand": "docker compose -f docker-compose.base44.yml up -d --build",
+  "secrets": [
+    {
+      "name": "MUX_TOKEN_ID",
+      "description": "Mux API Token ID — from the Mux dashboard 'Save token' dialog (Token ID field)",
+      "requiredAtBoot": false
+    },
+    {
+      "name": "MUX_TOKEN_SECRET",
+      "description": "Mux API Token Secret — from the Mux dashboard 'Save token' dialog (Secret Key field)",
+      "requiredAtBoot": false
+    }
+  ]
+}

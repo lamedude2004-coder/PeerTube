@@ -1,0 +1,16 @@
+import { ResponseTuple } from '../types';
+import { ErrorResponses, UploadxErrorResponse } from './errors';
+export interface ValidatorConfig<T> {
+    value?: any;
+    isValid?: (t: T) => boolean | Promise<boolean>;
+    response?: ResponseTuple | UploadxErrorResponse;
+}
+export type Validation<T> = Record<string, ValidatorConfig<T>>;
+export declare class Validator<T> {
+    private prefix;
+    private errorResponses?;
+    private _validators;
+    constructor(prefix?: string, errorResponses?: ErrorResponses | undefined);
+    add(config: Validation<T>): void;
+    verify(t: T): Promise<void>;
+}

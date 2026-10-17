@@ -1,0 +1,7 @@
+import type { ColorBits } from '../core/bits';
+/**
+ * The relative brightness of any point in a color space, normalized to 0 for
+ * darkest black and 1 for lightest white.
+ * @returns The relative brightness of the color in the range 0 - 1, with 3 digits precision
+ */
+export declare function getLuminance(color: ColorBits): number;

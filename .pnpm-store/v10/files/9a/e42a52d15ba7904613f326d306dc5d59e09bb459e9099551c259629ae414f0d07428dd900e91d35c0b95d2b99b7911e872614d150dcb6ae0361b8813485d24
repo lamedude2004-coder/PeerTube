@@ -1,0 +1,9 @@
+import { ColorBits } from '../core/bits';
+import type { Tokens } from './tokenizer';
+/**
+ * Resolve a color function from its tokenized form: either a relative color
+ * (`rgb(from …)`) or an absolute function with calc() channels.
+ * @param tokens tokenized function
+ * @param parseColor parser for the origin color (recursive; handles nested colors)
+ */
+export declare function resolveColorFunction(tokens: Tokens, parseColor: (input: string) => ColorBits): ColorBits;

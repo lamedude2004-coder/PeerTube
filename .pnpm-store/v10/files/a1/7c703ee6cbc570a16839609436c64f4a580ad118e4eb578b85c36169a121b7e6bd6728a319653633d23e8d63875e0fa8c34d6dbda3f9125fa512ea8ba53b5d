@@ -1,0 +1,19 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.blend = blend;
+const bits_1 = require("../core/bits");
+/**
+ * Blend (aka mix) two colors together.
+ * @param background The background color
+ * @param overlay The overlay color affected by `opacity`
+ * @param opacity Opacity (alpha) for `overlay`
+ * @param [gamma=1.0] Gamma correction coefficient. `1.0` to match browser behavior, `2.2` for gamma-corrected blending.
+ */
+function blend(background, overlay, opacity, gamma = 1.0) {
+    const blendChannel = (b, o) => Math.round((b ** (1 / gamma) * (1 - opacity) + o ** (1 / gamma) * opacity) ** gamma);
+    const r = blendChannel((0, bits_1.getRed)(background), (0, bits_1.getRed)(overlay));
+    const g = blendChannel((0, bits_1.getGreen)(background), (0, bits_1.getGreen)(overlay));
+    const b = blendChannel((0, bits_1.getBlue)(background), (0, bits_1.getBlue)(overlay));
+    return (0, bits_1.newColor)(r, g, b, 255);
+}
+//# sourceMappingURL=blend.js.map

@@ -1,0 +1,6 @@
+const require_mod = require('./mod.cjs');
+
+//#region src/install.ts
+require_mod.install();
+
+//#endregion

@@ -1,0 +1,196 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseHandler = void 0;
+const events_1 = require("events");
+const storages_1 = require("../storages");
+const utils_1 = require("../utils");
+const cors_1 = require("./cors");
+class BaseHandler extends events_1.EventEmitter {
+    /**
+     * Limiting enabled http method handlers
+     * @example
+     * ```ts
+     * Uploadx.methods = ['post', 'put', 'delete'];
+     * app.use('/upload', uploadx(opts));
+     * ```
+     */
+    static methods = ['delete', 'get', 'head', 'options', 'patch', 'post', 'put'];
+    cors;
+    responseType = 'json';
+    storage;
+    registeredHandlers = new Map();
+    logger;
+    constructor(options = {}) {
+        super();
+        this.cors = new cors_1.Cors();
+        this.storage =
+            'storage' in options
+                ? options.storage
+                : new storages_1.DiskStorage(options);
+        if (options.userIdentifier) {
+            this.getUserId = options.userIdentifier;
+        }
+        this.logger = utils_1.uploadxLogger.getChild(this.constructor.name);
+        this.compose();
+    }
+    set errorResponses(value) {
+        Object.assign(this.storage.errorResponses, value);
+    }
+    compose() {
+        const child = this.constructor;
+        (child.methods || BaseHandler.methods).forEach(method => {
+            const handler = this[method];
+            handler && this.registeredHandlers.set(method.toUpperCase(), handler.bind(this));
+            // handler && this.cors.allowedMethods.push(method.toUpperCase());
+        });
+        this.logger.debug(`registered handlers: ${[...this.registeredHandlers.keys()].join(', ')}`);
+    }
+    handle = (req, res) => this.upload(req, res);
+    upload = (req, res, next) => {
+        if (this.cors.preflight(req, res)) {
+            res.writeHead(204, { 'Content-Length': 0 }).end();
+            return;
+        }
+        if (this.storage.config.basePath) {
+            const { pathname } = new URL(req.originalUrl || req.url || '', 'http://localhost');
+            const basePath = this.storage.basePath;
+            const match = basePath === '/' || pathname === basePath || pathname.startsWith(`${basePath}/`);
+            if (!match)
+                return this.sendError(res, new utils_1.UploadxError(utils_1.ERRORS.FILE_NOT_FOUND));
+        }
+        req.on('error', err => this.logger.error('Request error', { err }));
+        this.logger.debug('Request {method} {url}', { method: req.method, url: req.url });
+        const handler = this.registeredHandlers.get(req.method);
+        if (!handler) {
+            return this.sendError(res, new utils_1.UploadxError(utils_1.ERRORS.METHOD_NOT_ALLOWED));
+        }
+        if (!this.storage.isReady) {
+            return this.sendError(res, new utils_1.UploadxError(utils_1.ERRORS.STORAGE_ERROR));
+        }
+        handler(req, res)
+            .then(async (file) => {
+            if ('status' in file && file.status) {
+                this.logger.debug('Upload {status}: {name} {bytesWritten}/{size}', {
+                    status: file.status,
+                    name: file.name,
+                    bytesWritten: file.bytesWritten,
+                    size: file.size
+                });
+                this.listenerCount(file.status) &&
+                    this.emit(file.status, { ...file, request: (0, utils_1.pick)(req, ['headers', 'method', 'url']) });
+                if (file.status === 'completed') {
+                    if (next) {
+                        req['_body'] = true;
+                        req['body'] = file;
+                        next();
+                    }
+                    else {
+                        const completed = await this.storage.onComplete(file);
+                        this.finish(req, res, completed);
+                    }
+                }
+                return;
+            }
+            if (req.method === 'GET') {
+                req['body'] = file;
+                next ? next() : this.send(res, { statusCode: 200, body: file });
+            }
+            return;
+        })
+            .catch(err => {
+            const errorPayload = {
+                ...(0, utils_1.pick)(err, Object.getOwnPropertyNames(err)),
+                request: (0, utils_1.pick)(req, ['headers', 'method', 'url'])
+            };
+            this.listenerCount('error') && this.emit('error', errorPayload);
+            this.logger.error('{errorPayload.message} {*}', { errorPayload });
+            if ('aborted' in req && req['aborted'])
+                return;
+            return this.sendError(res, err);
+        });
+    };
+    getUserId = (req, _res) => req.user?.id || req.user?._id; // eslint-disable-line
+    async options(req, res) {
+        this.send(res, { statusCode: 204 });
+        return {};
+    }
+    /**
+     * Returns user uploads list
+     */
+    get(req, res) {
+        const userId = this.getUserId(req, res);
+        return userId ? this.storage.list((0, utils_1.tokenize)(userId)) : (0, utils_1.fail)(utils_1.ERRORS.FILE_NOT_FOUND);
+    }
+    /**
+     * Make response
+     */
+    send(res, { statusCode = 200, headers = {}, body = '' }) {
+        (0, utils_1.setHeaders)(res, headers);
+        let data;
+        if (typeof body !== 'string') {
+            data = JSON.stringify(body);
+            if (!headers['Content-Type'])
+                res.setHeader('Content-Type', 'application/json');
+        }
+        else {
+            data = body;
+        }
+        res.setHeader('Content-Length', Buffer.byteLength(data));
+        res.setHeader('Cache-Control', 'no-store');
+        res.writeHead(statusCode);
+        res.end(data);
+    }
+    /**
+     * Send Error to client
+     */
+    sendError(res, error) {
+        let info;
+        if ((0, utils_1.isUploadxError)(error)) {
+            info = this.storage.errorResponses[error.uploadxErrorCode] ??
+                utils_1.ErrorMap[error.uploadxErrorCode] ?? {
+                code: error.uploadxErrorCode,
+                message: error.message,
+                statusCode: 500,
+                cause: error.cause
+            };
+        }
+        else {
+            info = this.storage.normalizeError(error);
+        }
+        const response = { ...this.storage.onError(info) };
+        if (!response.body) {
+            response.body = { error: { code: info.code, message: info.message } };
+        }
+        this.send(res, response);
+    }
+    /**
+     * Get id from request
+     */
+    getId(req) {
+        const { pathname } = new URL(req.url || '', 'http://localhost');
+        return pathname.split('/').filter(Boolean).pop() ?? '';
+    }
+    async getAndVerifyId(req, res) {
+        const uid = this.getUserId(req, res) || '';
+        const id = this.getId(req);
+        if (id && id.startsWith((0, utils_1.tokenize)(uid)))
+            return id;
+        return (0, utils_1.fail)(utils_1.ERRORS.FORBIDDEN);
+    }
+    /**
+     * Build file url from request
+     */
+    buildFileUrl(req, file) {
+        const requestUrl = new URL(req.originalUrl || req.url || '', 'http://localhost');
+        const relative = `${requestUrl.pathname}/${file.id}${requestUrl.search}`;
+        if (this.storage.config.useRelativeLocation)
+            return relative;
+        const { baseUrl } = this.storage.config;
+        const base = typeof baseUrl === 'function' ? baseUrl(req) : baseUrl || (0, utils_1.getBaseUrl)(req);
+        return base + relative;
+    }
+    finish(req, res, response) {
+        return this.send(res, response);
+    }
+}
+exports.BaseHandler = BaseHandler;

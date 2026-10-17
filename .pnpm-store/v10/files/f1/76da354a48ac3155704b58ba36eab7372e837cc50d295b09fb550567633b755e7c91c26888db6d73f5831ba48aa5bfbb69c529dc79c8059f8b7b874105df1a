@@ -1,0 +1,64 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MetaStorage = void 0;
+const util_1 = require("util");
+const utils_1 = require("../utils");
+const file_1 = require("./file");
+/**
+ * Stores upload metadata
+ */
+class MetaStorage {
+    prefix = '';
+    suffix = '';
+    logger = utils_1.uploadxLogger.getChild(this.constructor.name);
+    constructor(options) {
+        this.prefix = options?.prefix ?? '';
+        this.suffix = options?.suffix ?? '.META';
+        this.prefix && file_1.FileName.INVALID_PREFIXES.push(this.prefix);
+        this.suffix && file_1.FileName.INVALID_SUFFIXES.push(this.suffix);
+    }
+    /**
+     * Saves upload metadata
+     */
+    async save(id, file) {
+        return file;
+    }
+    /**
+     * Deletes an upload metadata
+     */
+    async delete(id) {
+        return;
+    }
+    /**
+     * Retrieves upload metadata
+     */
+    async get(id) {
+        return Promise.reject();
+    }
+    /**
+     * Mark upload active
+     */
+    async touch(id, file) {
+        return file;
+    }
+    /**
+     * Retrieves a list of uploads whose names begin with the prefix
+     * @experimental
+     */
+    async list(prefix = '') {
+        return { items: [] };
+    }
+    getMetaName(id) {
+        return this.prefix + id + this.suffix;
+    }
+    getIdFromMetaName(name) {
+        return name.slice(this.prefix.length, name.length - this.suffix.length);
+    }
+    toString() {
+        return `[${this.constructor.name}: prefix="${this.prefix}", suffix="${this.suffix}"]`;
+    }
+    [util_1.inspect.custom]() {
+        return this.toString();
+    }
+}
+exports.MetaStorage = MetaStorage;

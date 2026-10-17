@@ -413,3 +413,47 @@ Export to Jaeger (tracing) or Prometheus (metrics) is configurable in
   — Library / business-logic documentation
 - [SECURITY.md](SECURITY.md) — Vulnerability disclosure policy
 - [FAQ.md](FAQ.md) — Frequently asked questions
+
+## Base44 sandbox (development preview)
+
+The sandbox runs this repository **from source** through
+`docker-compose.base44.yml` — never the production compose under
+`support/docker/production/`:
+
+```bash
+docker compose -f docker-compose.base44.yml up -d --build
+```
+
+- A single `app` service runs the PeerTube server (`:9000`, live reload)
+  and the Angular dev server (`:3000`, the preview entry point) together
+  via `concurrently`. Postgres and Redis are plain compose services; the
+  server reaches them through the `NODE_CONFIG` value in the compose file.
+  Data lives in the `peertube_postgres_data` volume.
+- The client is served with the `sandbox` Angular configuration
+  (`client/src/environments/environment.sandbox.ts`, plus
+  `PeerTube:build:sandbox` and the matching `serve` configuration in
+  `client/angular.json`). It leaves the backend URLs relative so requests
+  go through the dev-server proxy (`client/proxy.config.json` plus a
+  `/tracker/socket` entry generated at startup) and use the browser's own
+  origin instead of a hardcoded `localhost:9000`.
+- The first boot takes several minutes: `pnpm install --frozen-lockfile`,
+  `npm run tsc -- -b server/tsconfig.json`, the standalone player build and
+  the runtime `tsc` compile of `server/` all run before the dev servers
+  answer (see the `command:` block in the compose file).
+- The app image is a plain `node:22` runtime with ffmpeg
+  (`.base44/Dockerfile`); the repository is bind-mounted, so source edits
+  reload live.
+- PeerTube runs with `NODE_ENV=dev`, where the installer always creates the
+  root user with the dev password (`test`) and ignores
+  `PT_INITIAL_ROOT_PASSWORD`. To change it:
+
+  ```bash
+  docker compose -f docker-compose.base44.yml exec -T app \
+    sh -c "printf '<new-password>\n' | node dist/scripts/reset-password.js -u root"
+  ```
+
+  The root account's email comes from `admin.email` in
+  `config/default.yaml` (`admin@example.com`).
+- The platform passes `BASE44_PREVIEW_MODE=1` into the app; keep any
+  sandbox-only behaviour behind that flag so the shared configuration keeps
+  its normal behaviour without it.

@@ -1,0 +1,4 @@
+import { t as startDevTools } from "../runtime-DxwmjAOb.js";
+//#region src/client/inject-hidden/index.ts
+startDevTools("hidden");
+//#endregion

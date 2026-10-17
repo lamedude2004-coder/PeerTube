@@ -1,0 +1,29 @@
+{
+    "name": "@types/create-torrent",
+    "version": "6.1.1",
+    "description": "TypeScript definitions for create-torrent",
+    "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/create-torrent",
+    "license": "MIT",
+    "contributors": [
+        {
+            "name": "Jesse Chan",
+            "githubUsername": "jesec",
+            "url": "https://github.com/jesec"
+        }
+    ],
+    "type": "module",
+    "main": "",
+    "types": "index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+        "directory": "types/create-torrent"
+    },
+    "scripts": {},
+    "dependencies": {
+        "@types/node": "*"
+    },
+    "peerDependencies": {},
+    "typesPublisherContentHash": "1c164f1a861c48d65600321bda8f93e7afd6fb3d59503cfde4eb59b4b113f6b4",
+    "typeScriptVersion": "5.2"
+}

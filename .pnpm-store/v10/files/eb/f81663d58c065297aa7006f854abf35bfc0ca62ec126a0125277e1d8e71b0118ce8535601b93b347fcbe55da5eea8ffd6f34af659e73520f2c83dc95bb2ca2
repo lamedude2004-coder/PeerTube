@@ -1,0 +1,30 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.fromEnv = void 0;
+const core_1 = require("@uploadx/core");
+const S3_ENV = {
+    BUCKET: 'S3_BUCKET',
+    ENDPOINT: 'S3_ENDPOINT',
+    FORCE_PATH_STYLE: 'S3_FORCE_PATH_STYLE',
+    KEYFILE: 'S3_KEYFILE',
+    REGION: 'S3_REGION'
+};
+const getS3Env = (prefix, key) => {
+    return process.env[prefix + S3_ENV[key]];
+};
+const fromEnv = (prefix = core_1.DEFAULT_PREFIX) => {
+    const bucket = getS3Env(prefix, 'BUCKET');
+    const keyFile = getS3Env(prefix, 'KEYFILE');
+    const region = getS3Env(prefix, 'REGION');
+    const endpoint = getS3Env(prefix, 'ENDPOINT');
+    const forcePathStyle = getS3Env(prefix, 'FORCE_PATH_STYLE');
+    return {
+        ...(0, core_1.commonFromEnv)(prefix),
+        ...(bucket && { bucket }),
+        ...(keyFile && { keyFile }),
+        ...(region && { region }),
+        ...(endpoint && { endpoint }),
+        ...(forcePathStyle !== undefined && { forcePathStyle: (0, core_1.toBoolean)(forcePathStyle) })
+    };
+};
+exports.fromEnv = fromEnv;

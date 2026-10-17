@@ -1,0 +1,68 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.S3MetaStorage = void 0;
+const client_s3_1 = require("@aws-sdk/client-s3");
+const credential_providers_1 = require("@aws-sdk/credential-providers");
+const core_1 = require("@uploadx/core");
+const BUCKET_NAME = 'node-uploadx';
+class S3MetaStorage extends core_1.MetaStorage {
+    options;
+    bucket;
+    client;
+    constructor(options) {
+        super(options);
+        this.options = options;
+        this.bucket = options.bucket || BUCKET_NAME;
+        if (options.keyFile) {
+            options.credentials = (0, credential_providers_1.fromIni)({ configFilepath: options.keyFile });
+        }
+        this.client = new client_s3_1.S3Client(options);
+    }
+    async get(id) {
+        const params = { Bucket: this.bucket, Key: this.getMetaName(id) };
+        const { Metadata } = await this.client.send(new client_s3_1.HeadObjectCommand(params));
+        if (Metadata) {
+            return JSON.parse(decodeURIComponent(Metadata.metadata));
+        }
+        return Promise.reject();
+    }
+    async delete(id) {
+        const params = { Bucket: this.bucket, Key: this.getMetaName(id) };
+        await this.client.send(new client_s3_1.DeleteObjectCommand(params));
+    }
+    async save(id, file) {
+        const metadata = encodeURIComponent(JSON.stringify(file));
+        const params = {
+            Bucket: this.bucket,
+            Key: this.getMetaName(id),
+            Metadata: { metadata },
+            ContentLength: 0
+        };
+        await this.client.send(new client_s3_1.PutObjectCommand(params));
+        return file;
+    }
+    async list(prefix) {
+        const params = {
+            Bucket: this.bucket,
+            Prefix: this.prefix + prefix
+        };
+        const items = [];
+        const response = await this.client.send(new client_s3_1.ListObjectsV2Command(params));
+        if (response.Contents?.length) {
+            for (const { Key, LastModified } of response.Contents) {
+                Key &&
+                    LastModified &&
+                    Key.endsWith(this.suffix) &&
+                    items.push({
+                        id: this.getIdFromMetaName(Key),
+                        createdAt: LastModified
+                    });
+            }
+        }
+        return { items, prefix };
+    }
+    toString() {
+        return `[${this.constructor.name}: bucket="${this.bucket}", prefix="${this.prefix}", suffix="${this.suffix}"]`;
+    }
+}
+exports.S3MetaStorage = S3MetaStorage;

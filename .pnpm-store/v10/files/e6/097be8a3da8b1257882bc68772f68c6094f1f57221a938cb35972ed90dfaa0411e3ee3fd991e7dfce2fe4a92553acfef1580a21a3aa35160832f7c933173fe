@@ -1,0 +1,24 @@
+import { configureSync, getLogger, getConsoleSink, resetSync, type LogLevel as LogTapeLogLevel, type Logger as LogTapeLogger } from '@logtape/logtape';
+export type LogLevel = LogTapeLogLevel;
+export type Logger = LogTapeLogger;
+/**
+ * The primary logger for the uploadx library.
+ * Applications should configure the 'uploadx' category.
+ *
+ * @example
+ * ```ts
+ * await configure({
+ *   sinks: { console: getConsoleSink() },
+ *   loggers: [{ category: ['uploadx'], lowestLevel: 'info', sinks: ['console'] }]
+ * });
+ * ```
+ */
+export declare const uploadxLogger: LogTapeLogger;
+/**
+ * Configures the LogTape logger for simple console output if a logLevel is provided and not 'none'.
+ * This function is called from the Storage constructor to enable logging based on user configuration.
+ */
+export declare function configureSimpleLogger(logLevel: string | undefined): void;
+/** @deprecated Use `uploadxLogger` instead */
+export declare const logger: LogTapeLogger;
+export { configureSync, getConsoleSink, getLogger, resetSync };

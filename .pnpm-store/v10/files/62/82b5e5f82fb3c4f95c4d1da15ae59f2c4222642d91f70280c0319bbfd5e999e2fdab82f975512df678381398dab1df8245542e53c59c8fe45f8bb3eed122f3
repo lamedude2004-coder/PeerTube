@@ -1,0 +1,27 @@
+import { SpawnRequest, TerminalBackend, TerminalMode, TerminalPreset, TerminalSessionInfo, TerminalStatus, TerminalsOptions, TerminalsSharedState } from "./types.mjs";
+import { DEFAULT_PORT, PLUGIN_ID, PRESETS_STATE_KEY, SESSIONS_STATE_KEY, TERMINAL_STREAM_CHANNEL } from "./constants.mjs";
+import { DevframeDefinition } from "devframe/types";
+//#region src/index.d.ts
+/**
+ * Build a {@link DevframeDefinition} for the terminals panel. The same
+ * definition runs standalone (`createCac`), mounts into a Vite host
+ * (`/vite`), or docks inside a hub — its `setup` only relies on the core
+ * devframe RPC surface.
+ *
+ * @experimental This plugin is experimental and may change without a major
+ * version bump until it stabilizes.
+ *
+ * @example
+ * ```ts
+ * import { createTerminalsDevframe } from '@devframes/plugin-terminals'
+ *
+ * export default createTerminalsDevframe({
+ *   presets: [{ id: 'dev', title: 'pnpm dev', command: 'pnpm', args: ['dev'] }],
+ * })
+ * ```
+ */
+declare function createTerminalsDevframe(options?: TerminalsOptions): DevframeDefinition;
+/** Default-configured terminals devframe (interactive shell, no presets). */
+declare const terminals: DevframeDefinition;
+//#endregion
+export { DEFAULT_PORT, PLUGIN_ID, PRESETS_STATE_KEY, SESSIONS_STATE_KEY, type SpawnRequest, TERMINAL_STREAM_CHANNEL, type TerminalBackend, type TerminalMode, type TerminalPreset, type TerminalSessionInfo, type TerminalStatus, type TerminalsOptions, type TerminalsSharedState, createTerminalsDevframe, terminals as default };

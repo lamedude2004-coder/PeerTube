@@ -1,0 +1,62 @@
+import { IncomingMessage } from '../types';
+import { ERRORS, UploadxErrorResponse } from '../utils';
+import { File, FileInit, FilePart, FileQuery } from './file';
+import { LocalMetaStorageOptions } from './local-meta-storage';
+import { MetaStorage } from './meta-storage';
+import { BaseStorage, BaseStorageOptions } from './storage';
+export declare class DiskFile extends File {
+}
+export type DiskStorageOptions = BaseStorageOptions<DiskFile> & {
+    /**
+     * Uploads directory
+     * @defaultValue './files'
+     * @deprecated Use {@link uploadDir} instead
+     */
+    directory?: string;
+    /**
+     * Uploads directory
+     * @defaultValue './files'
+     */
+    uploadDir?: string;
+    /**
+     * Metafiles storage directory.
+     * Overrides `metaStorageOptions.directory`.
+     * When not set, defaults to `uploadDir`.
+     */
+    metaDir?: string;
+    /**
+     * Configure metafile storage on the local disk
+     * @example
+     * ```ts
+     * const storage = new DiskStorage({
+     *   uploadDir: 'upload',
+     *   metaStorageOptions: { directory: '/tmp/upload-metafiles', prefix: '.' }
+     * });
+     * ```
+     */
+    metaStorageOptions?: LocalMetaStorageOptions;
+    /**
+     * @deprecated Use {@link metaStorageOptions} instead
+     */
+    metaStorageConfig?: LocalMetaStorageOptions;
+};
+/**
+ * Local Disk Storage
+ */
+export declare class DiskStorage extends BaseStorage<DiskFile> {
+    options: DiskStorageOptions;
+    checksumTypes: string[];
+    directory: string;
+    meta: MetaStorage<DiskFile>;
+    constructor(options?: DiskStorageOptions);
+    normalizeError(error: Error): UploadxErrorResponse;
+    accessCheck(): Promise<void>;
+    create(req: IncomingMessage, fileInit: FileInit): Promise<DiskFile>;
+    write(part: FilePart | FileQuery): Promise<DiskFile>;
+    delete({ id }: FileQuery): Promise<DiskFile[]>;
+    /**
+     * Returns path for the uploaded file
+     */
+    getFilePath(filename: string): string;
+    protected _write(part: FilePart & File): Promise<[number, ERRORS?]>;
+}

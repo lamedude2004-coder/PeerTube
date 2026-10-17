@@ -1,0 +1,209 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.toBoolean = exports.tokenize = exports.memoize = exports.uid = exports.pick = void 0;
+exports.md5 = md5;
+exports.fnv = fnv;
+exports.fnv64 = fnv64;
+exports.mapValues = mapValues;
+exports.isEqual = isEqual;
+exports.isNumber = isNumber;
+exports.isRecord = isRecord;
+exports.extendObject = extendObject;
+exports.toMilliseconds = toMilliseconds;
+exports.toSeconds = toSeconds;
+exports.clamp = clamp;
+exports.getFirstOne = getFirstOne;
+exports.getLastOne = getLastOne;
+exports.durationToMs = durationToMs;
+const crypto_1 = require("crypto");
+const util_1 = require("util");
+const cache_1 = require("./cache");
+const UPLOADX_SECRET = process.env['UPLOADX_SECRET'] || 'UPLOADX_SECRET';
+const pick = (obj, whitelist) => {
+    const result = {};
+    whitelist.forEach(key => (result[key] = obj[key]));
+    return result;
+};
+exports.pick = pick;
+const uid = () => (0, crypto_1.randomBytes)(16).toString('hex');
+exports.uid = uid;
+function md5(str) {
+    return (0, crypto_1.createHash)('md5').update(str).digest('hex');
+}
+/**
+ * FNV1A32 hash
+ */
+function fnv(str) {
+    let hash = 2166136261;
+    const bytes = Buffer.from(str, 'utf8');
+    for (const byte of bytes) {
+        hash ^= byte;
+        hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return (hash >>> 0).toString(16);
+}
+/**
+ * FNV1A64 hash
+ */
+function fnv64(str) {
+    let hash = 14695981039346656037n;
+    const offset = 1099511628211n;
+    const bytes = Buffer.from(str, 'utf8');
+    for (const byte of bytes) {
+        hash ^= BigInt(byte);
+        hash = BigInt.asUintN(64, hash * offset);
+    }
+    return hash.toString(16);
+}
+function mapValues(object, func) {
+    const result = {};
+    const keys = Object.keys(object);
+    for (const key of keys) {
+        result[key] = func(object[key]);
+    }
+    return result;
+}
+function isEqual(a, b, ...keysToIgnore) {
+    if (!a || !b)
+        return false;
+    return (0, util_1.isDeepStrictEqual)(Object.fromEntries(Object.entries(a).filter(e => !keysToIgnore.includes(e[0]))), Object.fromEntries(Object.entries(b).filter(e => !keysToIgnore.includes(e[0]))));
+}
+function isNumber(x) {
+    return typeof x === 'number' && !isNaN(x);
+}
+function isRecord(x) {
+    return x !== null && typeof x === 'object' && !Array.isArray(x);
+}
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+/**
+ * Recursively merges source objects into a target object, skipping unsafe keys.
+ * Mutates the target object.
+ */
+function extendObject(target, ...sources) {
+    for (const source of sources) {
+        if (!isRecord(source))
+            continue;
+        for (const key of Object.keys(source)) {
+            if (!UNSAFE_KEYS.has(key)) {
+                const value = source[key];
+                if (isRecord(value)) {
+                    if (!isRecord(target[key])) {
+                        target[key] = {};
+                    }
+                    extendObject(target[key], value);
+                }
+                else {
+                    target[key] = value;
+                }
+            }
+        }
+    }
+    return target;
+}
+/**
+ * Convert a human-readable duration to ms
+ */
+function toMilliseconds(value) {
+    if (isNumber(value))
+        return value;
+    if (!value)
+        return undefined;
+    return durationToMs(value);
+}
+/**
+ * Convert a human-readable duration to seconds
+ */
+function toSeconds(value) {
+    if (isNumber(value))
+        return Math.floor(value / 1000);
+    if (!value)
+        return undefined;
+    return Math.floor(durationToMs(value) / 1000);
+}
+/**
+ * Clamps a value between a minimum and maximum bound
+ */
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(value, max));
+}
+/**
+ * Returns a first element of an array
+ */
+function getFirstOne(val) {
+    return val[0];
+}
+/**
+ * Returns a last element of an array
+ */
+function getLastOne(val) {
+    return val[val.length - 1];
+}
+/**
+ * Returns a function that caches the result of func
+ * @param fn - function to be called
+ */
+const memoize = (fn) => {
+    const cache = new cache_1.Cache(1000);
+    return (arg) => {
+        const key = JSON.stringify(arg);
+        let result = cache.get(key);
+        if (result === undefined && !cache.has(key)) {
+            result = fn(arg);
+            cache.set(key, result);
+        }
+        return result;
+    };
+};
+exports.memoize = memoize;
+exports.tokenize = (0, exports.memoize)((str) => {
+    return fnv64(str + UPLOADX_SECRET);
+});
+const toBoolean = (val) => {
+    return ['true', '1', 'y', 'yes'].includes(String(val).trim().toLowerCase());
+};
+exports.toBoolean = toBoolean;
+function durationToMs(input) {
+    if (input.length > 50) {
+        throw new Error('Input string exceeds maximum length of 50 characters');
+    }
+    const integerRegex = /^-?(0|[1-9]\d*)$/;
+    if (integerRegex.test(input)) {
+        return Number(input);
+    }
+    const durationRegex = /(\d+)\s*([a-zA-Z]+)/g;
+    const matches = Array.from(input.matchAll(durationRegex));
+    if (matches.length === 0) {
+        throw new Error('Invalid duration format');
+    }
+    const matchedString = matches.map(match => match[0]).join('');
+    if (matchedString.replace(/\s+/g, '') !== input.replace(/\s+/g, '')) {
+        throw new Error('Invalid duration format');
+    }
+    const unitMultipliers = {
+        s: 1000,
+        m: 60000,
+        h: 3600000,
+        d: 86400000,
+        w: 604800000,
+        M: 2592000000, // 30 days
+        y: 31536000000 // 365 days
+    };
+    let totalMs = 0;
+    for (const match of matches) {
+        const value = parseInt(match[1], 10);
+        const unit = match[2];
+        let key;
+        if (unit === 'M' || unit.toLowerCase().startsWith('mo')) {
+            key = 'M';
+        }
+        else {
+            key = unit[0].toLowerCase();
+        }
+        const multiplier = unitMultipliers[key];
+        if (!multiplier) {
+            throw new Error(`Invalid time unit: ${unit}`);
+        }
+        totalMs += value * multiplier;
+    }
+    return totalMs;
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@nodable/base-output-builder",
+  "version": "2.0.0",
+  "description": "Base output builder for flexible-xml-parser",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "flexible-xml-parser",
+    "nodable",
+    "xml"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Amit Gupta (https://solothought.com)",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@nodable/entities": "^2.2.0",
+    "is-unsafe": "^1.0.1",
+    "path-expression-matcher": "^1.6.1",
+    "strnum": "^2.4.1"
+  },
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/nodable"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nodable/flexible-output-builders.git"
+  },
+  "devDependencies": {
+    "jasmine": "^6.3.0"
+  }
+}

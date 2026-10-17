@@ -1,0 +1,43 @@
+{
+  "name": "ngx-uploadx",
+  "version": "7.1.0",
+  "description": "Angular Resumable Upload Module",
+  "keywords": [
+    "angular",
+    "chunk",
+    "resumable",
+    "tus",
+    "upload",
+    "uploadx"
+  ],
+  "author": {
+    "name": "Oleg Kukhariev",
+    "email": "q_h@inbox.ru"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kukhariev/ngx-uploadx.git"
+  },
+  "homepage": "https://github.com/kukhariev/ngx-uploadx#readme",
+  "license": "MIT",
+  "peerDependencies": {
+    "@angular/core": ">=17.0.0 <23.0.0",
+    "rxjs": "^7.8.0"
+  },
+  "module": "fesm2022/ngx-uploadx.mjs",
+  "typings": "types/ngx-uploadx.d.ts",
+  "exports": {
+    "./package.json": {
+      "default": "./package.json"
+    },
+    ".": {
+      "types": "./types/ngx-uploadx.d.ts",
+      "default": "./fesm2022/ngx-uploadx.mjs"
+    }
+  },
+  "sideEffects": false,
+  "type": "module",
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
+}

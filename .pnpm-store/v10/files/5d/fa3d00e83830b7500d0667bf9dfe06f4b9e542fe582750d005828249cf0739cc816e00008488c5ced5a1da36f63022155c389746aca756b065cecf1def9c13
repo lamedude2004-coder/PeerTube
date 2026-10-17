@@ -1,0 +1,65 @@
+import { escapeCdata, sanitize, sanitizeUrl } from "../utils";
+
+describe("Sanitizing", () => {
+  it("should sanitize & to &amp;", () => {
+    expect('&amp;').toEqual(sanitize('&'));
+  });
+  it("should handle multiple &", () => {
+    expect('https://test.com/?page=1&amp;size=3&amp;length=10').toEqual(sanitize('https://test.com/?page=1&size=3&length=10'));
+  });
+
+  it("should handle undefined", () => {
+    var undefined;
+    expect(sanitize(undefined)).toBeUndefined();
+  });
+});
+
+describe("Escaping CDATA", () => {
+  // xml-js only escapes the first `]]>`, so a second one used to close the section and inject markup
+  it("should escape every ]]> occurrence, not just the first", () => {
+    expect(escapeCdata(']]>]]>')).toEqual(']]]]><![CDATA[>]]]]><![CDATA[>');
+    expect(escapeCdata('a]]>b]]>c]]>d')).toEqual('a]]]]><![CDATA[>b]]]]><![CDATA[>c]]]]><![CDATA[>d');
+  });
+
+  it("should leave content without ]]> untouched", () => {
+    expect(escapeCdata('a normal <b>title</b> & more')).toEqual('a normal <b>title</b> & more');
+  });
+});
+
+describe("Sanitizing URLs", () => {
+  it("should drop URLs using a script capable scheme", () => {
+    expect(sanitizeUrl('javascript:alert(1)')).toBeUndefined();
+    expect(sanitizeUrl('data:text/html,<script>alert(1)</script>')).toBeUndefined();
+    expect(sanitizeUrl('vbscript:msgbox(1)')).toBeUndefined();
+    expect(sanitizeUrl('blob:https://test.com/uuid')).toBeUndefined();
+    expect(sanitizeUrl('file:///etc/passwd')).toBeUndefined();
+  });
+
+  it("should drop script capable schemes whatever their casing or padding", () => {
+    expect(sanitizeUrl('JaVaScRiPt:alert(1)')).toBeUndefined();
+    expect(sanitizeUrl('  javascript:alert(1)')).toBeUndefined();
+    expect(sanitizeUrl('java\tscript:alert(1)')).toBeUndefined();
+    expect(sanitizeUrl('java\nscript:alert(1)')).toBeUndefined();
+  });
+
+  it("should keep the schemes a feed legitimately uses", () => {
+    expect(sanitizeUrl('https://test.com/video')).toEqual('https://test.com/video');
+    expect(sanitizeUrl('http://test.com/video')).toEqual('http://test.com/video');
+    expect(sanitizeUrl('magnet:?xt=urn:btih:abc')).toEqual('magnet:?xt=urn:btih:abc');
+    expect(sanitizeUrl('wss://tracker.test.com')).toEqual('wss://tracker.test.com');
+  });
+
+  it("should keep relative URLs, which cannot carry a scheme", () => {
+    expect(sanitizeUrl('/videos/watch/1')).toEqual('/videos/watch/1');
+    expect(sanitizeUrl('//test.com/video')).toEqual('//test.com/video');
+  });
+
+  it("should still escape XML entities", () => {
+    expect(sanitizeUrl('https://test.com/?a=1&b=2')).toEqual('https://test.com/?a=1&amp;b=2');
+  });
+
+  it("should handle undefined", () => {
+    expect(sanitizeUrl(undefined)).toBeUndefined();
+    expect(sanitizeUrl(null)).toBeNull();
+  });
+});

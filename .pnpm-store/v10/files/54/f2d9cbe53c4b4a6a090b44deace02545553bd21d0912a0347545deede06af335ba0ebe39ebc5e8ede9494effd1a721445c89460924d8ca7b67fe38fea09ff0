@@ -1,0 +1,63 @@
+{
+  "name": "chai-json-schema",
+  "version": "2.0.1",
+  "description": "Chai plugin for JSON Schema v4",
+  "author": {
+    "name": "Bart van der Schoor",
+    "url": "https://github.com/chaijs"
+  },
+  "keywords": [
+    "array",
+    "assert",
+    "assertion",
+    "browser",
+    "chai",
+    "chai-plugin",
+    "json",
+    "json-schema",
+    "objects",
+    "schema",
+    "test",
+    "testing"
+  ],
+  "homepage": "http://chaijs.com",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chaijs/chai-json-schema.git"
+  },
+  "bugs": {
+    "url": "https://github.com/chaijs/chai-json-schema/issues"
+  },
+  "main": "./index",
+  "files": [
+    "index.js",
+    "LICENSE-MIT",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">= 20"
+  },
+  "scripts": {
+    "lint": "eslint index.js test",
+    "format": "prettier --write eslint.config.mjs package.json .prettierrc.json",
+    "format:check": "prettier --check eslint.config.mjs package.json .prettierrc.json",
+    "test:pass": "mocha test/suite.js",
+    "test:fail": "mocha test/fail.js",
+    "test": "npm run lint && npm run format:check && npm run test:pass && npm run test:fail"
+  },
+  "dependencies": {
+    "jsonpointer.js": "0.4.0",
+    "tv4": "^1.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "chai": "^6.2.2",
+    "eslint": "^9.0.0",
+    "mocha": "^11.0.0",
+    "prettier": "^3.0.0"
+  },
+  "peerDependencies": {
+    "chai": ">= 5"
+  }
+}

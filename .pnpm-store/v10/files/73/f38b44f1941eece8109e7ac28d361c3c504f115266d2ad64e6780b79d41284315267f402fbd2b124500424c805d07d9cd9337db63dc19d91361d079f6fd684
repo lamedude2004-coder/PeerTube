@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git worktree *)",
+      "Bash(npx tsx *)",
+      "mcp__zym__set_worktree"
+    ]
+  }
+}

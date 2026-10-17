@@ -1,0 +1,47 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.fromEnv = exports.commonFromEnv = exports.DEFAULT_PREFIX = void 0;
+const CORE_ENV = {
+    BASE_URL: 'BASE_URL',
+    MAX_FILE_SIZE: 'MAX_FILE_SIZE',
+    ALLOWED_MIME_TYPES: 'ALLOWED_MIME_TYPES',
+    BASE_PATH: 'BASE_PATH',
+    UPLOAD_DIR: 'UPLOAD_DIR',
+    META_DIR: 'META_DIR',
+    LOG_LEVEL: 'LOG_LEVEL',
+    EXPIRATION: 'EXPIRATION'
+};
+exports.DEFAULT_PREFIX = '';
+const getEnv = (prefix, key) => {
+    return process.env[prefix + CORE_ENV[key]];
+};
+const commonFromEnv = (prefix = exports.DEFAULT_PREFIX) => {
+    const baseUrl = getEnv(prefix, 'BASE_URL');
+    const maxFileSize = getEnv(prefix, 'MAX_FILE_SIZE');
+    const basePath = getEnv(prefix, 'BASE_PATH');
+    const allowedMimeTypes = getEnv(prefix, 'ALLOWED_MIME_TYPES')
+        ?.split(',')
+        .map(mime => mime.trim())
+        .filter(Boolean);
+    const logLevel = getEnv(prefix, 'LOG_LEVEL');
+    const expiration = getEnv(prefix, 'EXPIRATION');
+    return {
+        ...(baseUrl && { baseUrl }),
+        ...(maxFileSize && { maxFileSize }),
+        ...(basePath && { basePath }),
+        ...(allowedMimeTypes?.length && { allowedMimeTypes }),
+        ...(logLevel && { logLevel }),
+        ...(expiration && { expiration })
+    };
+};
+exports.commonFromEnv = commonFromEnv;
+const fromEnv = (prefix = exports.DEFAULT_PREFIX) => {
+    const uploadDir = getEnv(prefix, 'UPLOAD_DIR');
+    const metaDir = getEnv(prefix, 'META_DIR');
+    return {
+        ...(0, exports.commonFromEnv)(prefix),
+        ...(uploadDir && { uploadDir }),
+        ...(metaDir && { metaDir })
+    };
+};
+exports.fromEnv = fromEnv;

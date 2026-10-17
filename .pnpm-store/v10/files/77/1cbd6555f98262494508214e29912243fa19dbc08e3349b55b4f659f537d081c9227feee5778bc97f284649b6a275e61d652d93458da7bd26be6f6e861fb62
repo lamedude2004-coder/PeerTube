@@ -1,0 +1,19 @@
+import { ColorBits } from '../core/bits';
+/**
+ * Parse CSS color. Fast path: supports hexadecimal and the absolute forms of
+ * every CSS color function. For named colors, relative colors (`from …`) and
+ * `color-mix()`, use `parseCSS` from `color-bits/css`.
+ * @param color CSS color string: #xxx, #xxxxxx, #xxxxxxxx, rgb(), rgba(), hsl(), hsla(), color()
+ */
+export declare function parse(color: string): ColorBits;
+/**
+ * Parse hexadecimal CSS color
+ * @param color Hex color string: #xxx, #xxxxxx, #xxxxxxxx
+ */
+export declare function parseHex(color: string): ColorBits;
+/**
+ * Parse CSS color
+ * https://developer.mozilla.org/en-US/docs/Web/CSS/color_value
+ * @param color CSS color string: rgb(), rgba(), hsl(), hsla(), color()
+ */
+export declare function parseColor(color: string): ColorBits;

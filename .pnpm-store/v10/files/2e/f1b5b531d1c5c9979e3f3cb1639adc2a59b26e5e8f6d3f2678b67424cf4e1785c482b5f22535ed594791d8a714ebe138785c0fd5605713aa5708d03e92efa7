@@ -1,0 +1,85 @@
+{
+  "name": "@devframes/plugin-inspect",
+  "type": "module",
+  "version": "0.8.2",
+  "description": "Devframe plugin — a self-inspector for the RPC registry, shared state, and agent surface of a devframe connection.",
+  "author": "Anthony Fu <anthonyfu117@hotmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/devframes/devframe#readme",
+  "repository": {
+    "directory": "plugins/inspect",
+    "type": "git",
+    "url": "git+https://github.com/devframes/devframe.git"
+  },
+  "bugs": "https://github.com/devframes/devframe/issues",
+  "keywords": [
+    "devframe",
+    "devframe-plugin",
+    "devtools",
+    "rpc",
+    "inspector"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./client": "./dist/client/index.mjs",
+    "./cli": "./dist/cli.mjs",
+    "./node": "./dist/node/index.mjs",
+    "./vite": "./dist/vite.mjs",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/index.d.mts",
+  "bin": {
+    "devframe-inspect": "./bin.mjs"
+  },
+  "files": [
+    "bin.mjs",
+    "dist"
+  ],
+  "peerDependencies": {
+    "vite": "^7.0.0 || ^8.0.0",
+    "devframe": "0.8.2"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@valibot/to-json-schema": "^1.7.1",
+    "cac": "^7.0.0",
+    "nostics": "^1.2.0"
+  },
+  "devDependencies": {
+    "@antfu/design": "^0.3.3",
+    "@iconify-json/ph": "^1.2.2",
+    "@standard-schema/spec": "^1.1.0",
+    "@storybook/addon-docs": "^10.5.6",
+    "@storybook/vue3-vite": "^10.5.6",
+    "@unocss/preset-icons": "^66.7.5",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "colorjs.io": "^0.7.1",
+    "floating-vue": "^5.2.2",
+    "get-port-please": "^3.2.0",
+    "h3": "^2.0.1-rc.26",
+    "reka-ui": "^2.10.1",
+    "storybook": "^10.5.6",
+    "tsdown": "^0.22.14",
+    "unocss": "^66.7.5",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10",
+    "vue": "^3.5.40",
+    "ws": "^8.21.2",
+    "@devframes/hub": "0.8.2",
+    "devframe": "0.8.2"
+  },
+  "scripts": {
+    "build": "tsdown && vite build --config src/spa/vite.config.ts",
+    "dev": "vite --config src/spa/vite.config.ts",
+    "watch": "tsdown --watch",
+    "cli:build": "node bin.mjs build --out-dir dist/static",
+    "storybook": "storybook dev -p 6012",
+    "build-storybook": "storybook build",
+    "test": "vitest run"
+  }
+}

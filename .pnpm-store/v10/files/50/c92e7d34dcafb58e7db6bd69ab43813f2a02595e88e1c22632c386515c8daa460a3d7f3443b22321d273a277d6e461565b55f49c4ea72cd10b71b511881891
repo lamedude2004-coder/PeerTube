@@ -1,0 +1,294 @@
+import { toFilter } from "./filter.js";
+import { compareLogLevel, isLogLevel } from "./level.js";
+
+//#region src/scoped-config.ts
+const scopedConfigSymbol = Symbol.for("logtape.scopedConfig");
+const defaultScopedLogger = {
+	filters: [],
+	lowestLevel: "trace",
+	parentSinks: "inherit",
+	sinks: []
+};
+const noFilters = [];
+function compileScopedConfig(config, allowAsync, createError) {
+	if (!isObjectLike(config)) throw createError("Configuration must be an object.");
+	if (!isObjectLike(config.sinks)) throw createError("Configuration must include a sinks object.");
+	if (!Array.isArray(config.loggers)) throw createError("Configuration must include a loggers array.");
+	if (config.filters !== void 0 && !isObjectLike(config.filters)) throw createError("Configuration filters must be an object.");
+	const nodes = /* @__PURE__ */ new Map();
+	const configuredCategories = /* @__PURE__ */ new Set();
+	for (const logger of config.loggers) {
+		if (!isObjectLike(logger)) throw createError("Logger configuration must be an object.");
+		const loggerConfig = logger;
+		const category = normalizeCategory(loggerConfig.category, createError);
+		if (loggerConfig.sinks !== void 0 && !Array.isArray(loggerConfig.sinks)) throw createError("Logger sinks must be an array.");
+		if (loggerConfig.filters !== void 0 && !Array.isArray(loggerConfig.filters)) throw createError("Logger filters must be an array.");
+		if (loggerConfig.parentSinks !== void 0 && loggerConfig.parentSinks !== "inherit" && loggerConfig.parentSinks !== "override") throw createError("Logger parentSinks must be \"inherit\" or \"override\".");
+		if (loggerConfig.lowestLevel !== void 0 && loggerConfig.lowestLevel !== null && !isLogLevel(loggerConfig.lowestLevel)) throw createError("Logger lowestLevel must be a log level or null.");
+		const key = categoryKey(category);
+		if (configuredCategories.has(key)) throw createError(`Duplicate logger configuration for category: ${key}. Each category can only be configured once.`);
+		configuredCategories.add(key);
+		const sinks = [];
+		const sinkIds = loggerConfig.sinks ?? [];
+		for (const sinkId of sinkIds) {
+			const sink = config.sinks[sinkId];
+			if (!sink) throw createError(`Sink not found: ${sinkId}.`);
+			if (typeof sink !== "function") throw createError(`Sink must be a function: ${sinkId}.`);
+			sinks.push(sink);
+		}
+		const filters = [];
+		const filterIds = loggerConfig.filters ?? [];
+		for (const filterId of filterIds) {
+			const filter = config.filters?.[filterId];
+			if (filter === void 0) throw createError(`Filter not found: ${filterId}.`);
+			if (!isFilterLike(filter)) throw createError(`Filter must be a function, log level, or null: ${filterId}.`);
+			filters.push(toFilter(filter));
+		}
+		nodes.set(key, {
+			filters,
+			lowestLevel: loggerConfig.lowestLevel === void 0 ? "trace" : loggerConfig.lowestLevel,
+			parentSinks: loggerConfig.parentSinks ?? "inherit",
+			sinks
+		});
+	}
+	const syncFilters = /* @__PURE__ */ new Set();
+	const asyncFilters = /* @__PURE__ */ new Set();
+	const syncSinks = /* @__PURE__ */ new Set();
+	const asyncSinks = /* @__PURE__ */ new Set();
+	for (const sink of Object.values(config.sinks)) {
+		if (!isObjectLike(sink)) continue;
+		if (Symbol.asyncDispose in sink) {
+			if (!allowAsync) throw createError("Async disposables cannot be used with withConfigSync().");
+			asyncSinks.add(sink);
+		} else if (Symbol.dispose in sink) syncSinks.add(sink);
+	}
+	for (const filter of Object.values(config.filters ?? {})) {
+		if (!isObjectLike(filter)) continue;
+		if (Symbol.asyncDispose in filter) {
+			if (!allowAsync) throw createError("Async disposables cannot be used with withConfigSync().");
+			asyncFilters.add(filter);
+			asyncSinks.delete(filter);
+		} else if (Symbol.dispose in filter) {
+			syncFilters.add(filter);
+			syncSinks.delete(filter);
+		}
+	}
+	return {
+		asyncFilters,
+		asyncSinks,
+		dispatchCache: /* @__PURE__ */ new Map(),
+		disposed: false,
+		filterCache: /* @__PURE__ */ new Map(),
+		nodes,
+		parent: void 0,
+		syncFilters,
+		syncSinks
+	};
+}
+function getCurrentScopedConfig(contextLocalStorage) {
+	const store = contextLocalStorage?.getStore();
+	const scopedConfig = store?.[scopedConfigSymbol];
+	return isCompiledScopedConfig(scopedConfig) ? getActiveScopedConfig(scopedConfig) : void 0;
+}
+function runWithScopedConfig(contextLocalStorage, scopedConfig, callback) {
+	const parentStore = contextLocalStorage.getStore() ?? {};
+	scopedConfig.parent = getCurrentScopedConfig(contextLocalStorage);
+	return contextLocalStorage.run({
+		...parentStore,
+		[scopedConfigSymbol]: scopedConfig
+	}, callback);
+}
+function scopedConfigHasSink(scopedConfig, category, level) {
+	return getScopedSinkDispatchPlan(scopedConfig, category, level).kind !== "none";
+}
+function emitWithScopedConfig(scopedConfig, record, bypassSinks, emitToSink) {
+	const plan = getScopedSinkDispatchPlan(scopedConfig, record.category, record.level);
+	if (plan.kind === "none") return;
+	if (!filterScopedRecord(scopedConfig, record.category, record)) return;
+	if (plan.kind === "one") {
+		if (!bypassSinks?.has(plan.sink)) emitToSink(plan.sink, bypassSinks);
+		return;
+	}
+	for (const sink of plan.sinks) {
+		if (bypassSinks?.has(sink)) continue;
+		emitToSink(sink, bypassSinks);
+	}
+}
+async function disposeScopedConfig(scopedConfig, retainedDisposables) {
+	const parentDisposables = getParentScopedDisposables(scopedConfig, retainedDisposables);
+	scopedConfig.disposed = true;
+	const errors = [];
+	try {
+		disposeSyncDisposables(scopedConfig.syncFilters, parentDisposables);
+	} catch (error) {
+		errors.push(error);
+	}
+	try {
+		await disposeAsyncDisposables(scopedConfig.asyncFilters, parentDisposables);
+	} catch (error) {
+		errors.push(error);
+	}
+	try {
+		disposeSyncDisposables(scopedConfig.syncSinks, parentDisposables);
+	} catch (error) {
+		errors.push(error);
+	}
+	try {
+		await disposeAsyncDisposables(scopedConfig.asyncSinks, parentDisposables);
+	} catch (error) {
+		errors.push(error);
+	}
+	throwDisposeErrors(errors);
+}
+function disposeScopedConfigSync(scopedConfig, retainedDisposables) {
+	const parentDisposables = getParentScopedDisposables(scopedConfig, retainedDisposables);
+	scopedConfig.disposed = true;
+	const errors = [];
+	try {
+		disposeSyncDisposables(scopedConfig.syncFilters, parentDisposables);
+	} catch (error) {
+		errors.push(error);
+	}
+	try {
+		disposeSyncDisposables(scopedConfig.syncSinks, parentDisposables);
+	} catch (error) {
+		errors.push(error);
+	}
+	throwDisposeErrors(errors);
+}
+function throwCombinedErrors(primary, secondary) {
+	throw new AggregateError(flattenErrors(primary, secondary), "Multiple errors occurred while running LogTape scoped configuration.");
+}
+function isCompiledScopedConfig(value) {
+	return value != null && typeof value === "object" && "nodes" in value;
+}
+function isObjectLike(value) {
+	return value != null && (typeof value === "object" || typeof value === "function");
+}
+function isFilterLike(value) {
+	return value == null || typeof value === "function" || typeof value === "string" && isLogLevel(value);
+}
+function getActiveScopedConfig(scopedConfig) {
+	let activeConfig = scopedConfig;
+	while (activeConfig?.disposed) activeConfig = activeConfig.parent;
+	return activeConfig;
+}
+function getParentScopedDisposables(scopedConfig, extraRetained) {
+	const disposables = new Set(extraRetained);
+	let parent = scopedConfig.parent;
+	while (parent != null) {
+		const activeParent = getActiveScopedConfig(parent);
+		if (activeParent == null) break;
+		addScopedDisposables(disposables, activeParent);
+		parent = activeParent.parent;
+	}
+	return disposables;
+}
+function addScopedDisposables(disposables, scopedConfig) {
+	for (const disposable of scopedConfig.syncFilters) disposables.add(disposable);
+	for (const disposable of scopedConfig.asyncFilters) disposables.add(disposable);
+	for (const disposable of scopedConfig.syncSinks) disposables.add(disposable);
+	for (const disposable of scopedConfig.asyncSinks) disposables.add(disposable);
+}
+function normalizeCategory(category, createError) {
+	if (typeof category === "string") return [category];
+	if (!Array.isArray(category)) throw createError("Logger category must be a string or array of strings.");
+	if (category.some((part) => typeof part !== "string")) throw createError("Logger category must only contain strings.");
+	return [...category];
+}
+function categoryKey(category) {
+	return JSON.stringify(category);
+}
+function getScopedSinkDispatchPlan(scopedConfig, category, level) {
+	const cacheKey = `${categoryKey(category)}:${level}`;
+	let plan = scopedConfig.dispatchCache.get(cacheKey);
+	if (plan == null) {
+		plan = getScopedSinkDispatchPlanForPrefix(scopedConfig, category, category.length, level);
+		scopedConfig.dispatchCache.set(cacheKey, plan);
+	}
+	return plan;
+}
+function getScopedSinkDispatchPlanForPrefix(scopedConfig, category, length, level) {
+	const prefix = category.slice(0, length);
+	const logger = scopedConfig.nodes.get(categoryKey(prefix)) ?? defaultScopedLogger;
+	if (logger.lowestLevel === null || compareLogLevel(level, logger.lowestLevel) < 0) return { kind: "none" };
+	const parentPlan = length > 0 && logger.parentSinks === "inherit" ? getScopedSinkDispatchPlanForPrefix(scopedConfig, category, length - 1, level) : { kind: "none" };
+	let firstSink;
+	let sinks;
+	const appendSink = (sink) => {
+		if (sinks != null) sinks.push(sink);
+		else if (firstSink == null) firstSink = sink;
+		else sinks = [firstSink, sink];
+	};
+	if (parentPlan.kind === "one") appendSink(parentPlan.sink);
+	else if (parentPlan.kind === "many") for (const sink of parentPlan.sinks) appendSink(sink);
+	for (const sink of logger.sinks) appendSink(sink);
+	if (sinks != null) return {
+		kind: "many",
+		sinks
+	};
+	if (firstSink != null) return {
+		kind: "one",
+		sink: firstSink
+	};
+	return { kind: "none" };
+}
+function filterScopedRecord(scopedConfig, category, record) {
+	const key = categoryKey(category);
+	let filters = scopedConfig.filterCache.get(key);
+	if (filters == null) {
+		filters = getScopedFilters(scopedConfig, category);
+		scopedConfig.filterCache.set(key, filters);
+	}
+	return filters.every((filter) => filter(record));
+}
+function getScopedFilters(scopedConfig, category) {
+	for (let length = category.length; length >= 0; length--) {
+		const logger = scopedConfig.nodes.get(categoryKey(category.slice(0, length)));
+		if (logger == null || logger.filters.length < 1) continue;
+		return logger.filters;
+	}
+	return noFilters;
+}
+function disposeSyncDisposables(disposables, retainedDisposables) {
+	const disposableList = filterRetainedDisposables(disposables, retainedDisposables);
+	const errors = [];
+	try {
+		for (const disposable of disposableList) try {
+			disposable[Symbol.dispose]();
+		} catch (error) {
+			errors.push(error);
+		}
+	} finally {
+		disposables.clear();
+	}
+	throwDisposeErrors(errors);
+}
+async function disposeAsyncDisposables(disposables, retainedDisposables) {
+	const disposableList = filterRetainedDisposables(disposables, retainedDisposables);
+	for (const disposable of disposableList) disposables.delete(disposable);
+	try {
+		const results = await Promise.allSettled(disposableList.map((disposable) => Promise.resolve().then(() => disposable[Symbol.asyncDispose]())));
+		throwDisposeErrors(results.filter((result) => result.status === "rejected").map((result) => result.reason));
+	} finally {
+		disposables.clear();
+	}
+}
+function filterRetainedDisposables(disposables, retainedDisposables) {
+	return Array.from(disposables).filter((disposable) => !retainedDisposables.has(disposable));
+}
+function throwDisposeErrors(errors) {
+	if (errors.length < 1) return;
+	if (errors.length === 1) throw errors[0];
+	throw new AggregateError(errors, "Multiple errors occurred while disposing LogTape scoped resources.");
+}
+function flattenErrors(...errors) {
+	const flattened = [];
+	for (const error of errors) if (error instanceof AggregateError) flattened.push(...error.errors);
+	else flattened.push(error);
+	return flattened;
+}
+
+//#endregion
+export { compileScopedConfig, disposeScopedConfig, disposeScopedConfigSync, emitWithScopedConfig, getCurrentScopedConfig, runWithScopedConfig, scopedConfigHasSink, throwCombinedErrors };
+//# sourceMappingURL=scoped-config.js.map

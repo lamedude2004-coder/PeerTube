@@ -1,0 +1,61 @@
+import { ColorBits } from '../core/bits';
+/** Build ColorBits from sRGB components in [0, 1] and an alpha byte (0..255). */
+export declare function srgbToColor(r: number, g: number, b: number, a: number): ColorBits;
+/**
+ * @param h degrees, any value (wrapped by 360°)
+ * @param s nominally 0..100 (clamped)
+ * @param l nominally 0..100 (clamped)
+ * @param a alpha byte
+ */
+export declare function hslToColor(h: number, s: number, l: number, a: number): ColorBits;
+/** @param sRGB in [0, 1] @returns out as [h degrees, s 0..100, l 0..100] */
+export declare function srgbToHsl(r: number, g: number, b: number, out: Float64Array): Float64Array;
+/**
+ * @param h degrees, any value (wrapped by 360°)
+ * @param w nominally 0..100 (clamped)
+ * @param b nominally 0..100 (clamped)
+ * @param a alpha byte
+ */
+export declare function hwbToColor(h: number, w: number, b: number, a: number): ColorBits;
+/** @param sRGB in [0, 1] @returns out as [h degrees, w 0..100, b 0..100] */
+export declare function srgbToHwb(r: number, g: number, b: number, out: Float64Array): Float64Array;
+/** @param l 0..100 @param a raw @param b raw @param alpha alpha byte */
+export declare function labToColor(l: number, a: number, b: number, alpha: number): ColorBits;
+/** @param sRGB in [0, 1] @returns out as [l 0..100, a raw, b raw] */
+export declare function srgbToLab(r: number, g: number, b: number, out: Float64Array): Float64Array;
+/** @param l 0..100 @param c raw @param h degrees @param alpha alpha byte */
+export declare function lchToColor(l: number, c: number, h: number, alpha: number): ColorBits;
+/** @param sRGB in [0, 1] @returns out as [l 0..100, c raw, h degrees] */
+export declare function srgbToLch(r: number, g: number, b: number, out: Float64Array): Float64Array;
+/** @param l 0..1 @param a raw @param b raw @param alpha alpha byte */
+export declare function oklabToColor(l: number, a: number, b: number, alpha: number): ColorBits;
+/** @param sRGB in [0, 1] @returns out as [l 0..1, a raw, b raw] */
+export declare function srgbToOklab(r: number, g: number, b: number, out: Float64Array): Float64Array;
+/** @param l 0..1 @param c raw @param h degrees @param alpha alpha byte */
+export declare function oklchToColor(l: number, c: number, h: number, alpha: number): ColorBits;
+/** @param sRGB in [0, 1] @returns out as [l 0..1, c raw, h degrees] */
+export declare function srgbToOklch(r: number, g: number, b: number, out: Float64Array): Float64Array;
+/** Channel keywords exposed by color(from <origin> <space> …) per color space. */
+export declare function colorSpaceChannels(space: string): string[] | null;
+/** @param channels in 0..1 @returns out as sRGB in [0, 1], or null for an unknown space */
+export declare function colorSpaceToSrgb(space: string, c1: number, c2: number, c3: number, out: Float64Array): Float64Array | null;
+/** @param channels in 0..1 @returns ColorBits, or null for an unknown space */
+export declare function colorSpaceToColor(space: string, c1: number, c2: number, c3: number, alpha: number): ColorBits | null;
+/** @param sRGB in [0, 1] @returns out as the space's channels in 0..1, or null for an unknown space */
+export declare function srgbToColorSpace(space: string, r: number, g: number, b: number, out: Float64Array): Float64Array | null;
+export interface ColorModel {
+    keys: [string, string, string];
+    /** percentage reference per channel (e.g. 100 for lab L, 360 for hues) */
+    ranges: [number, number, number];
+    /** whether each channel is a hue angle */
+    hues: [boolean, boolean, boolean];
+    /** sRGB in [0, 1] -> the model's keyword-unit channels, written into `out` and returned */
+    fromSrgb: (r: number, g: number, b: number, out: Float64Array) => Float64Array;
+    /** keyword-unit channels + alpha byte -> ColorBits */
+    toColor: (c1: number, c2: number, c3: number, alpha: number) => ColorBits;
+}
+/** Model for a color-model name (hsl, oklch, …), or null. Own-key lookup so
+ * that Object.prototype names ('constructor', '__proto__') are not models. */
+export declare function colorModel(name: string): ColorModel | null;
+/** Model for a color() predefined space (channels in 0..1), or null. */
+export declare function colorSpaceModel(space: string): ColorModel | null;

@@ -1,0 +1,50 @@
+import { setupInspect } from "./node/index.mjs";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { defineDevframe } from "devframe/types";
+//#region package.json
+var name = "@devframes/plugin-inspect";
+var version = "0.8.2";
+var description = "Devframe plugin — a self-inspector for the RPC registry, shared state, and agent surface of a devframe connection.";
+var homepage = "https://github.com/devframes/devframe#readme";
+//#endregion
+//#region src/index.ts
+/** Default devframe id — drives the hosted mount path `/__<id>/`. */
+const DEFAULT_ID = "devframes_plugin_inspect";
+const distDir = fileURLToPath(new URL("../dist/spa", import.meta.url));
+/**
+* Build a {@link DevframeDefinition} for the Devframe Inspector. The
+* same definition runs standalone (`/cli`, `/spa`, `/build`) and mounts
+* into a host (`/vite`, hub).
+*
+* @experimental This plugin is experimental and may change without a major
+* version bump until it stabilizes.
+*/
+function createInspectDevframe(options = {}) {
+	const id = options.id ?? DEFAULT_ID;
+	return defineDevframe({
+		id,
+		name: options.name ?? "Devframe Inspector",
+		version,
+		packageName: name,
+		homepage,
+		description,
+		icon: options.icon ?? "ph:stethoscope-duotone",
+		basePath: options.basePath,
+		cli: {
+			command: id,
+			port: options.port ?? 9012,
+			distDir: existsSync(distDir) ? distDir : void 0,
+			auth: options.auth ?? true
+		},
+		spa: { loader: "none" },
+		dock: { category: "~builtin" },
+		setup(ctx) {
+			setupInspect(ctx);
+		}
+	});
+}
+/** The default inspector devframe definition. */
+const inspectDevframe = createInspectDevframe();
+//#endregion
+export { inspectDevframe as n, createInspectDevframe as t };

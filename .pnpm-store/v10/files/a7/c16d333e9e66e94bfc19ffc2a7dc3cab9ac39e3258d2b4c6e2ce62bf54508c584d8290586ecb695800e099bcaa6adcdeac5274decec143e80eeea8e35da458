@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite DevTools</title>
+    <meta name="description" content="Vite DevTools" />
+    <script type="module" crossorigin src="./assets/index-Dr5enDBe.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-zDFEDVm4.css">
+  </head>
+  <body class="font-sans">
+    <div id="app"></div>
+  </body>
+</html>

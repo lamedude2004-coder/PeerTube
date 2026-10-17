@@ -300,6 +300,21 @@
                   "with": "src/environments/environment.hmr.ts"
                 }
               ]
+            },
+            "sandbox": {
+              "localize": false,
+              "budgets": [
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "6kb"
+                }
+              ],
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.sandbox.ts"
+                }
+              ]
             }
           }
         },
@@ -315,6 +330,9 @@
             },
             "ar-locale": {
               "buildTarget": "PeerTube:build:ar-locale"
+            },
+            "sandbox": {
+              "buildTarget": "PeerTube:build:sandbox"
             }
           }
         },

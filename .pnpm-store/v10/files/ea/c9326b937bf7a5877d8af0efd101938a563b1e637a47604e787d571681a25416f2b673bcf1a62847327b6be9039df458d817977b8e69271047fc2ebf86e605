@@ -1,0 +1,49 @@
+{
+  "name": "@uploadx/s3",
+  "version": "7.0.3",
+  "description": "Uploadx S3 module",
+  "keywords": [
+    "resumable",
+    "upload",
+    "uploadx",
+    "express",
+    "middleware",
+    "s3"
+  ],
+  "author": {
+    "name": "Oleg Kukhariev",
+    "url": "https://github.com/kukhariev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kukhariev/node-uploadx.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "files": [
+    "lib/"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "tsc -b .",
+    "clean": "rimraf ./tsconfig.tsbuildinfo ./lib"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.485.0",
+    "@aws-sdk/credential-providers": "^3.485.0",
+    "@aws-sdk/s3-request-presigner": "^3.485.0"
+  },
+  "devDependencies": {
+    "aws-sdk-client-mock": "^4.0.1",
+    "@aws-sdk/types": "^3.485.0"
+  },
+  "peerDependencies": {
+    "@uploadx/core": "^7.0.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,35 @@
+{
+    "name": "@types/bencode",
+    "version": "4.0.0",
+    "description": "TypeScript definitions for bencode",
+    "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/bencode",
+    "license": "MIT",
+    "contributors": [
+        {
+            "name": "Tobenna",
+            "githubUsername": "tobenna",
+            "url": "https://github.com/tobenna"
+        }
+    ],
+    "type": "module",
+    "main": "",
+    "types": "index.d.ts",
+    "exports": {
+        ".": {
+            "types": {
+                "default": "./index.d.ts"
+            }
+        },
+        "./package.json": "./package.json"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+        "directory": "types/bencode"
+    },
+    "scripts": {},
+    "dependencies": {},
+    "peerDependencies": {},
+    "typesPublisherContentHash": "7fcd5abf1c8b09a98af2747d50307e09afd6bb47e16343ce92ccfe28162234c6",
+    "typeScriptVersion": "5.6"
+}

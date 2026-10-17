@@ -1,0 +1,21 @@
+import { LogLevel } from "./level.js";
+import { FilterLike } from "./filter.js";
+import { Sink } from "./sink.js";
+
+//#region src/scoped-config.d.ts
+
+interface ScopedConfigLike<TSinkId extends string, TFilterId extends string> {
+  readonly sinks: Record<TSinkId, Sink>;
+  readonly filters?: Record<TFilterId, FilterLike>;
+  readonly loggers: readonly ScopedLoggerConfigLike<TSinkId, TFilterId>[];
+}
+interface ScopedLoggerConfigLike<TSinkId extends string, TFilterId extends string> {
+  readonly category: string | readonly string[];
+  readonly sinks?: readonly TSinkId[];
+  readonly parentSinks?: "inherit" | "override";
+  readonly filters?: readonly TFilterId[];
+  readonly lowestLevel?: LogLevel | null;
+}
+//#endregion
+export { ScopedConfigLike };
+//# sourceMappingURL=scoped-config.d.ts.map

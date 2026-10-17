@@ -1,0 +1,169 @@
+import { IncomingMessage, UploadxResponse } from '../types';
+import { Cache, ErrorResponses, Logger, LogLevel, UploadxErrorResponse, Validation, Validator } from '../utils';
+import { ExpirationInput, ExpirationOptions } from './expiration';
+import { File, FileInit, FilePart, FileQuery } from './file';
+import { MetaStorage, UploadList } from './meta-storage';
+/** Returns a unique user identifier.*/
+export type UserIdentifier = (req: any, res: any) => string;
+/** Called when a new upload is created. Return value sent as response; use `UploadxResponse` for full control. */
+export type OnCreate<T extends File = File> = (file: T) => unknown;
+/** Called when an upload is updated. Return value sent as response; use `UploadxResponse` for full control. */
+export type OnUpdate<T extends File = File> = (file: T) => unknown;
+/** Called when an upload is completed. Return value sent as response; use `UploadxResponse` for full control. */
+export type OnComplete<T extends File = File> = (file: T) => unknown;
+/** Called when an upload is cancelled. Return value sent as response; use `UploadxResponse` for full control. */
+export type OnDelete<T extends File = File> = (file: T) => unknown;
+/** Called on upload errors. Return `UploadxResponse` to override the default error response. */
+export type OnError = (error: UploadxErrorResponse) => UploadxResponse;
+export type PurgeList = UploadList & {
+    maxAgeMs: number;
+};
+export interface BaseStorageOptions<T extends File> {
+    /**
+     * Allowed MIME types
+     * @deprecated Use {@link allowedMimeTypes} instead
+     */
+    allowMIME?: string[];
+    /** Allowed MIME types */
+    allowedMimeTypes?: string[];
+    /**
+     * File size limit
+     * @deprecated Use {@link maxFileSize} instead
+     */
+    maxUploadSize?: number | string;
+    /** File size limit */
+    maxFileSize?: number | string;
+    /**
+     * File naming function
+     * @deprecated Use {@link namingFunction} instead
+     */
+    filename?: (file: T, req: any) => string;
+    /** File naming function */
+    namingFunction?: (file: T, req: any) => string;
+    /** Returns a unique user identifier.*/
+    userIdentifier?: UserIdentifier;
+    /** Force relative URI in Location header */
+    useRelativeLocation?: boolean;
+    /** Base URL for upload endpoints. If not provided, it is determined from the request. */
+    baseUrl?: string | ((req: any) => string);
+    /** Called when a new upload is created */
+    onCreate?: OnCreate<T>;
+    /** Called when an upload is updated */
+    onUpdate?: OnUpdate<T>;
+    /** Called when an upload is completed */
+    onComplete?: OnComplete<T>;
+    /** Called when an upload is cancelled */
+    onDelete?: OnDelete<T>;
+    /** Called on upload errors. Return `UploadxResponse` to override the default error response. */
+    onError?: OnError;
+    /**
+     * Node http base path
+     * @deprecated Use {@link basePath} instead
+     */
+    path?: string;
+    /** Node http base path */
+    basePath?: string;
+    /** Upload validation options */
+    validation?: Validation<T>;
+    /** Limiting the size of custom metadata */
+    maxMetadataSize?: number | string;
+    /** Provide custom meta storage  */
+    metaStorage?: MetaStorage<T>;
+    /**
+     * Automatic cleaning of abandoned and completed uploads
+     *
+     * @example
+     * ```ts
+     * // Shorthand — `purgeInterval` is computed automatically
+     * { expiration: '6h' }
+     * ```
+     * @example
+     * ```ts
+     * // Full control
+     * { expiration: { maxAge: '6h', purgeInterval: '30min', rolling: true } }
+     * ```
+     */
+    expiration?: ExpirationInput;
+    /**
+     * Set built-in logger severity level
+     * @defaultValue 'none'
+     */
+    logLevel?: LogLevel;
+}
+export declare abstract class BaseStorage<TFile extends File> {
+    options: BaseStorageOptions<TFile>;
+    onCreate: (file: TFile) => Promise<UploadxResponse>;
+    onUpdate: (file: TFile) => Promise<UploadxResponse>;
+    onComplete: (file: TFile) => Promise<UploadxResponse>;
+    onDelete: (file: TFile) => Promise<UploadxResponse>;
+    onError: OnError;
+    maxFileSize: number;
+    maxMetadataSize: number;
+    basePath: string;
+    isReady: boolean;
+    checksumTypes: string[];
+    cache: Cache<TFile>;
+    logger: Logger;
+    protected validation: Validator<TFile>;
+    protected namingFunction: (file: TFile, req: any) => string;
+    private _errorResponses;
+    abstract meta: MetaStorage<TFile>;
+    readonly config: Required<BaseStorageOptions<TFile>> & {
+        expiration: ExpirationOptions | undefined;
+    };
+    private purgeTimeoutId?;
+    protected constructor(options: BaseStorageOptions<TFile>);
+    get errorResponses(): ErrorResponses;
+    set errorResponses(value: Partial<ErrorResponses>);
+    validate(file: TFile): Promise<any>;
+    normalizeError(error: unknown): UploadxErrorResponse;
+    /**
+     * Saves upload metadata
+     */
+    saveMeta(file: TFile): Promise<TFile>;
+    /**
+     * Deletes an upload metadata
+     */
+    deleteMeta(id: string): Promise<void>;
+    /**
+     * Retrieves upload metadata.
+     *
+     * @remarks
+     * Returns a shallow copy — nested user metadata objects remain shared with the cache.
+     */
+    getMeta(id: string): Promise<TFile>;
+    checkIfExpired(file: TFile): Promise<TFile>;
+    /**
+     * Searches for and purges expired uploads
+     * @param maxAge - remove uploads older than a specified age
+     * @param prefix - filter uploads
+     */
+    purge(maxAge?: number | string, prefix?: string): Promise<PurgeList>;
+    get({ id }: FilePart): Promise<UploadList>;
+    /**
+     * Retrieves a list of uploads whose names begin with the prefix
+     * @experimental
+     */
+    list(prefix?: string): Promise<UploadList>;
+    /**
+     * Set user-provided metadata as key-value pairs
+     * @experimental
+     */
+    update({ id }: FileQuery, metadata: Partial<File>): Promise<TFile>;
+    protected isUnsupportedChecksum(algorithm?: string): boolean;
+    protected startAutoPurge(purgeInterval: number): void;
+    protected stopAutoPurge(): void;
+    protected updateTimestamps(file: TFile): TFile;
+    /**
+     *  Creates a new upload and saves its metadata
+     */
+    abstract create(req: IncomingMessage, file: FileInit): Promise<TFile>;
+    /**
+     *  Write part and/or return status of an upload
+     */
+    abstract write(part: FilePart | FileQuery): Promise<TFile>;
+    /**
+     * Deletes an upload and its metadata
+     */
+    abstract delete(query: FileQuery): Promise<TFile[]>;
+}

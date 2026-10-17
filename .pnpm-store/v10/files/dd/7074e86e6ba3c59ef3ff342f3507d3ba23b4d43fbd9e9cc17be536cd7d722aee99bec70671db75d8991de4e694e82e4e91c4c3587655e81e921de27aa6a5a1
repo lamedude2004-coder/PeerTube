@@ -1,0 +1,124 @@
+const require_rolldown_runtime = require('./_virtual/rolldown_runtime.cjs');
+const __logtape_logtape = require_rolldown_runtime.__toESM(require("@logtape/logtape"));
+const winston = require_rolldown_runtime.__toESM(require("winston"));
+const node_util = require_rolldown_runtime.__toESM(require("node:util"));
+
+//#region src/mod.ts
+const DEFAULT_LEVELS_MAP = {
+	"trace": "silly",
+	"debug": "debug",
+	"info": "info",
+	"warning": "warn",
+	"error": "error",
+	"fatal": "error"
+};
+/**
+* Creates a LogTape sink that forwards log records to a winston logger.
+*
+* This function creates a sink function that can be used with LogTape's
+* configuration system. The sink will format LogTape log records and
+* forward them to the provided winston logger instance.
+*
+* @example Basic usage
+* ```typescript
+* import winston from "winston";
+* import { configure } from "@logtape/logtape";
+* import { getWinstonSink } from "@logtape/adaptor-winston";
+*
+* const winstonLogger = winston.createLogger({
+*   level: "info",
+*   format: winston.format.combine(
+*     winston.format.timestamp(),
+*     winston.format.json()
+*   ),
+*   transports: [new winston.transports.Console()]
+* });
+*
+* await configure({
+*   sinks: {
+*     winston: getWinstonSink(winstonLogger)
+*   },
+*   loggers: [
+*     { category: ["myapp"], sinks: ["winston"] }
+*   ]
+* });
+* ```
+*
+* @example With custom options
+* ```typescript
+* const sink = getWinstonSink(winstonLogger, {
+*   category: {
+*     separator: ".",
+*     position: "start",
+*     decorator: "[]"
+*   },
+*   levelsMap: {
+*     "trace": "debug",  // Map trace to debug instead of silly
+*     "debug": "debug",
+*     "info": "info",
+*     "warning": "warn",
+*     "error": "error",
+*     "fatal": "error"
+*   }
+* });
+* ```
+*
+* @param logger The winston logger instance to forward logs to. Must implement
+*               the Logger interface with error, warn, info, http, verbose,
+*               debug, and silly methods.
+* @param options Configuration options for the sink behavior.
+* @returns A sink function that can be used with LogTape's configure() function.
+* @since 1.0.0
+*/
+function getWinstonSink(logger, options = {}) {
+	const { levelsMap = DEFAULT_LEVELS_MAP, valueFormatter = node_util.inspect } = options;
+	const categoryOptions = !options.category ? void 0 : typeof options.category === "object" ? options.category : {};
+	const category = categoryOptions == null ? void 0 : {
+		separator: categoryOptions.separator ?? "·",
+		position: categoryOptions.position ?? "start",
+		decorator: categoryOptions.decorator ?? ":"
+	};
+	return (record) => {
+		const level = levelsMap[record.level];
+		let message = "";
+		if (category?.position === "start" && record.category.length > 0) {
+			const joinedCategory = record.category.join(category.separator);
+			message += category.decorator === "[]" ? `[${joinedCategory}] ` : category.decorator === "()" ? `(${joinedCategory}) ` : category.decorator === "<>" ? `<${joinedCategory}> ` : category.decorator === "{}" ? `{${joinedCategory}} ` : category.decorator === ":" ? `${joinedCategory}: ` : category.decorator === "-" ? `${joinedCategory} - ` : category.decorator === "|" ? `${joinedCategory} | ` : category.decorator === "/" ? `${joinedCategory} / ` : `${joinedCategory} `;
+		}
+		for (let i = 0; i < record.message.length; i += 2) {
+			message += record.message[i];
+			if (i + 1 < record.message.length) message += valueFormatter(record.message[i + 1]);
+		}
+		if (category?.position === "end" && record.category.length > 0) {
+			const joinedCategory = record.category.join(category.separator);
+			message += category.decorator === "[]" ? ` [${joinedCategory}]` : category.decorator === "()" ? ` (${joinedCategory})` : category.decorator === "<>" ? ` <${joinedCategory}>` : category.decorator === "{}" ? ` {${joinedCategory}}` : category.decorator === ":" ? `: ${joinedCategory}` : category.decorator === "-" ? ` - ${joinedCategory}` : category.decorator === "|" ? ` | ${joinedCategory}` : category.decorator === "/" ? ` / ${joinedCategory}` : ` ${joinedCategory}`;
+		}
+		logger[level](message, record.properties);
+	};
+}
+function install(loggerOrOptions, options = {}) {
+	let logger;
+	let sinkOptions;
+	if (loggerOrOptions && ("error" in loggerOrOptions || "info" in loggerOrOptions)) {
+		logger = loggerOrOptions;
+		sinkOptions = options;
+	} else {
+		logger = winston.default;
+		sinkOptions = loggerOrOptions || {};
+	}
+	(0, __logtape_logtape.configureSync)({
+		sinks: { winston: getWinstonSink(logger, sinkOptions) },
+		loggers: [{
+			category: ["logtape", "meta"],
+			sinks: ["winston"],
+			lowestLevel: "warning"
+		}, {
+			category: [],
+			sinks: ["winston"]
+		}]
+	});
+}
+
+//#endregion
+exports.getWinstonSink = getWinstonSink;
+exports.install = install;
