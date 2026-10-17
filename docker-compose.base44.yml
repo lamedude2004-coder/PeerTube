@@ -114,7 +114,7 @@ services:
           echo '[base44] root admin password ensured' ) &
         exec node_modules/.bin/concurrently -k -n server,client -c blue,green \
           'sh scripts/dev/server.sh --skip-client' \
-          'cd client && exec node_modules/.bin/ng serve --proxy-config /tmp/base44-ng-proxy.config.json --hmr --configuration sandbox --host 0.0.0.0 --port 3000'
+          'cd client && exec node_modules/.bin/ng serve --proxy-config /tmp/base44-ng-proxy.config.json --hmr --live-reload=false --configuration sandbox --host 0.0.0.0 --port 3000'
 
 volumes:
   peertube_postgres_data:
