@@ -23,7 +23,9 @@ async function muxFetch (path, options = {}) {
     const body = await res.text().catch(() => '')
     throw new Error(`Mux API ${path} failed: ${res.status} ${body}`)
   }
-  return res.json()
+
+  const body = await res.text()
+  return body ? JSON.parse(body) : undefined
 }
 
 async function createDirectUpload () {
