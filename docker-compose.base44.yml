@@ -100,6 +100,7 @@ services:
           const fs = require('fs')
           const proxy = JSON.parse(fs.readFileSync('client/proxy.config.json', 'utf8'))
           proxy['/tracker/socket'] = { target: 'ws://127.0.0.1:9000', secure: false, ws: true }
+          proxy['/manifest.webmanifest'] = { target: 'http://127.0.0.1:9000', secure: false }
           fs.writeFileSync('/tmp/base44-ng-proxy.config.json', JSON.stringify(proxy, null, 2))
         "
 
