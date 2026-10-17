@@ -55,6 +55,8 @@ services:
     ports:
       - "3000:3000" # Angular client — the preview entry point
       - "9000:9000" # PeerTube server (API, ActivityPub, static files)
+    env_file:
+      - /run/base44/app.env
     environment:
       - NODE_ENV=dev
       - BASE44_PREVIEW_MODE
