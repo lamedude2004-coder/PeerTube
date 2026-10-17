@@ -94,10 +94,15 @@ async function register ({
         await new Promise(r => setTimeout(r, 3000))
 
         const files = await peertubeHelpers.videos.getFiles(video.id)
-        const webFiles = (files && files.webVideo && files.webVideo.videoFiles) || []
-        const hlsFiles = (files && files.hls && files.hls.videoFiles) || []
+        if (!files) {
+          logger.warn('Mux: getFiles returned no result for video ' + video.uuid + ', skipping')
+          return
+        }
+
+        const webFiles = (files.webVideo && files.webVideo.videoFiles) || []
+        const hlsFiles = (files.hls && files.hls.videoFiles) || []
         const allFiles = webFiles.concat(hlsFiles)
-        const file = allFiles.find(f => f.path)
+        const file = allFiles.find(f => f && f.path)
 
         if (!file) {
           logger.warn('Mux: no local file for video ' + video.uuid + ', skipping')
@@ -119,7 +124,7 @@ async function register ({
 
         logger.info('Mux: video ' + video.uuid + ' ready — playback ID: ' + result.playbackId)
       } catch (err) {
-        logger.error('Mux: failed to process video ' + video.uuid, { err: err.message })
+        logger.error('Mux: failed to process video ' + video.uuid, { err: err.message, stack: err.stack })
       }
     }
   })
